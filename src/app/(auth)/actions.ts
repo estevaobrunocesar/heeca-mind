@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
 import { db } from "@/lib/db";
 import { sendPasswordResetEmail } from "@/lib/email";
+import { formValues, invalid, type FormState } from "@/lib/form";
 import { slugify } from "@/lib/slug";
 import {
   loginSchema,
@@ -15,16 +16,9 @@ import {
   resetPasswordSchema,
 } from "@/lib/validation/auth";
 
-export type FormState = { error?: string; fieldErrors?: Record<string, string[]>; ok?: boolean };
+export type { FormState };
 
 const BCRYPT_COST = 12;
-
-function fieldErrors(err: { flatten: () => { fieldErrors: Record<string, string[] | undefined> } }) {
-  const flat = err.flatten().fieldErrors;
-  const out: Record<string, string[]> = {};
-  for (const [k, v] of Object.entries(flat)) if (v) out[k] = v;
-  return out;
-}
 
 // ──────────────────────────────────────────────────────────────
 // Cadastro
@@ -48,11 +42,11 @@ async function findFreeSlug(base: string): Promise<string> {
 
 export async function registerAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = registerSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  if (!parsed.success) return invalid(parsed.error, formData);
   const { fullName, displayName, crp, email, password } = parsed.data;
 
   const exists = await db.user.findUnique({ where: { email }, select: { id: true } });
-  if (exists) return { fieldErrors: { email: ["Este e-mail já está cadastrado"] } };
+  if (exists) return { fieldErrors: { email: ["Este e-mail já está cadastrado"] }, values: formValues(formData) };
 
   const passwordHash = await hash(password, BCRYPT_COST);
   const slug = await findFreeSlug(displayName);
@@ -91,14 +85,14 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
 
 export async function loginAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  if (!parsed.success) return invalid(parsed.error, formData);
 
   try {
     await signIn("credentials", { ...parsed.data, redirectTo: "/dashboard" });
     return { ok: true };
   } catch (err) {
     if (err instanceof AuthError) {
-      return { error: "E-mail ou senha incorretos" };
+      return { error: "E-mail ou senha incorretos", values: { email: parsed.data.email } };
     }
     throw err; // NEXT_REDIRECT e outros erros de framework sobem
   }
@@ -119,7 +113,7 @@ export async function requestPasswordResetAction(
   formData: FormData,
 ): Promise<FormState> {
   const parsed = requestResetSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  if (!parsed.success) return invalid(parsed.error, formData);
   const { email } = parsed.data;
 
   const user = await db.user.findUnique({ where: { email }, select: { id: true } });
@@ -146,7 +140,7 @@ export async function resetPasswordAction(
   formData: FormData,
 ): Promise<FormState> {
   const parsed = resetPasswordSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  if (!parsed.success) return invalid(parsed.error, formData);
   const { token, password } = parsed.data;
 
   const record = await db.passwordResetToken.findUnique({

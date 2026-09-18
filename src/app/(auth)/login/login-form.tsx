@@ -11,7 +11,14 @@ export function LoginForm({ justReset }: { justReset: boolean }) {
     <form action={action} className="space-y-4">
       {justReset && <FormSuccess message="Senha redefinida. Entre com a nova senha." />}
       <FormError message={state.error} />
-      <Field label="E-mail" name="email" type="email" autoComplete="email" errors={state.fieldErrors?.email} />
+      <Field
+        label="E-mail"
+        name="email"
+        type="email"
+        autoComplete="email"
+        defaultValue={state.values?.email}
+        errors={state.fieldErrors?.email}
+      />
       <Field
         label="Senha"
         name="password"

@@ -47,10 +47,17 @@ prisma/                schema, migrations, seed
 |---|---|
 | 1 Autenticação | ✅ cadastro, login, recuperação de senha |
 | 2 Configuração do consultório | ⬜ schema pronto, UI pendente |
-| 3 Serviços | ⬜ schema pronto, UI pendente |
+| 3 Serviços | ✅ CRUD, ordenação, ativar/desativar, exclusão protegida |
 | 4 Agenda | ⬜ schema pronto; cálculo de disponibilidade pendente |
 | 5 Pacientes | ⬜ schema pronto |
 | 6 Agendamento público | 🟡 perfil renderiza; fluxo de escolha de horário pendente |
 | 7 WhatsApp | 🟡 provider + templates + webhook (persistência); envio/fila pendente |
 | 8 Dashboard | 🟡 contadores básicos |
 | 9 Financeiro | ⬜ schema pronto |
+
+## Padrões de formulário
+
+- Server Actions com `useActionState`; estado tipado como `FormState` (`src/lib/form.ts`).
+- Em falha de validação, a action retorna `invalid(parsed.error, formData)` — devolve erros por campo **e** os valores digitados (exceto senhas/tokens), porque o React 19 reseta o `<form>` após a action. O componente usa `state.values?.campo ?? valorOriginal` como `defaultValue`.
+- `<Select>` remonta via `key={defaultValue}` — o React ignora mudanças de `defaultValue` em `<select>` depois do mount.
+- Ações de edição recebem o id via `action.bind(null, id)`, nunca por hidden input; o servidor sempre re-verifica a posse do registro.

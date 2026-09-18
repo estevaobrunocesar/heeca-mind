@@ -31,7 +31,7 @@ async function getPublicProfile(slug: string) {
         orderBy: { sortOrder: "asc" },
         select: { id: true, name: true, description: true, durationMinutes: true, priceCents: true, modality: true },
       },
-      policy: { select: { cancellationPolicy: true } },
+      policy: { select: { cancellationPolicy: true, reschedulePolicy: true } },
     },
   });
 }
@@ -107,10 +107,20 @@ export default async function PublicBookingPage({ params }: PageProps<"/agendar/
         )}
       </section>
 
-      {p.policy?.cancellationPolicy && (
-        <section className="mt-8 rounded-lg bg-surface-muted p-4 text-xs text-text-muted">
-          <p className="mb-1 font-medium text-text">Política de cancelamento</p>
-          <p>{p.policy.cancellationPolicy}</p>
+      {(p.policy?.cancellationPolicy || p.policy?.reschedulePolicy) && (
+        <section className="mt-8 space-y-3 rounded-lg bg-surface-muted p-4 text-xs text-text-muted">
+          {p.policy.cancellationPolicy && (
+            <div>
+              <p className="mb-1 font-medium text-text">Política de cancelamento</p>
+              <p>{p.policy.cancellationPolicy}</p>
+            </div>
+          )}
+          {p.policy.reschedulePolicy && (
+            <div>
+              <p className="mb-1 font-medium text-text">Reagendamento</p>
+              <p>{p.policy.reschedulePolicy}</p>
+            </div>
+          )}
         </section>
       )}
 

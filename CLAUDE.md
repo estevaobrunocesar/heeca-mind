@@ -46,7 +46,7 @@ prisma/                schema, migrations, seed
 | Módulo | Estado |
 |---|---|
 | 1 Autenticação | ✅ cadastro, login, recuperação de senha |
-| 2 Configuração do consultório | ⬜ schema pronto, UI pendente |
+| 2 Configuração do consultório | ✅ perfil, grade semanal, regras, bloqueios/exceções, políticas |
 | 3 Serviços | ✅ CRUD, ordenação, ativar/desativar, exclusão protegida |
 | 4 Agenda | ⬜ schema pronto; cálculo de disponibilidade pendente |
 | 5 Pacientes | ⬜ schema pronto |
@@ -61,3 +61,9 @@ prisma/                schema, migrations, seed
 - Em falha de validação, a action retorna `invalid(parsed.error, formData)` — devolve erros por campo **e** os valores digitados (exceto senhas/tokens), porque o React 19 reseta o `<form>` após a action. O componente usa `state.values?.campo ?? valorOriginal` como `defaultValue`.
 - `<Select>` remonta via `key={defaultValue}` — o React ignora mudanças de `defaultValue` em `<select>` depois do mount.
 - Ações de edição recebem o id via `action.bind(null, id)`, nunca por hidden input; o servidor sempre re-verifica a posse do registro.
+
+## Fuso horário
+
+- `src/lib/time.ts` é o único lugar de conversão. `dateTimeInTz("2026-09-22","15:00",tz)` -> UTC; `toLocalFields(date,tz)` -> campos de parede. Nunca `new Date("YYYY-MM-DDTHH:mm")` sem fuso.
+- `ScheduleException.date` e `RecurringSeries.startsOn/endsOn` são `@db.Date`: guardar `new Date("YYYY-MM-DDT00:00:00Z")` e ler com `getUTC*` — data civil, sem fuso.
+- Bloqueio "dia inteiro" = 00:00–23:59 no fuso da organização.

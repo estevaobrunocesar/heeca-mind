@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
+/*
+ * Tokens de design — Hecca Psico
+ * Paleta: sálvia + areia + carvão quente. Acolhedora, discreta, sem "azul de SaaS".
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-muted: #f3efe9;
+  --border: #e5ded4;
+  --text: #2b2a27;
+  --text-muted: #6f6a62;
+  --primary: #5f7a6a;
+  --primary-hover: #4d6558;
+  --primary-soft: #e6ede8;
+  --accent: #c98b5b;
+  --danger: #b8503f;
+  --danger-soft: #f7e6e2;
+  --success: #4f7d5b;
+  --warning: #b78a2f;
+  --radius: 12px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --radius-card: var(--radius);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/* Componentes utilitários compartilhados */
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text
+      placeholder:text-text-muted/70 outline-none transition
+      focus:border-primary focus:ring-2 focus:ring-primary/20;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-text;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
+      disabled:cursor-not-allowed disabled:opacity-60 bg-primary text-white hover:bg-primary-hover;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
+      disabled:cursor-not-allowed disabled:opacity-60 border border-border bg-surface text-text hover:bg-surface-muted;
+  }
+  .card {
+    @apply rounded-[var(--radius)] border border-border bg-surface p-6;
+  }
+  .field-error {
+    @apply mt-1 text-xs text-danger;
+  }
 }

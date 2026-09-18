@@ -1,0 +1,651 @@
+// Hecca Psico — schema multi-tenant
+//
+// Convenções:
+//  - Todo dado de negócio pertence a uma Organization (tenant). Queries devem
+//    sempre filtrar por organizationId — ver src/lib/tenant.ts.
+//  - Dados ADMINISTRATIVOS (Patient, Appointment) e CLÍNICOS (ClinicalNote)
+//    vivem em tabelas separadas. Conteúdo clínico é cifrado na aplicação.
+//  - Valores monetários em centavos (Int) para evitar float.
+//  - Datas/horas em UTC (DateTime). Horários de grade semanal em "HH:mm".
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────────────────────────────────────────
+// TENANT / AUTENTICAÇÃO
+// ───────────────────────────────────────────────────────────────
+
+enum OrganizationType {
+  SOLO // psicólogo autônomo
+  CLINIC // clínica com vários profissionais
+}
+
+model Organization {
+  id        String           @id @default(cuid())
+  name      String
+  type      OrganizationType @default(SOLO)
+  timezone  String           @default("America/Sao_Paulo")
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  memberships   Membership[]
+  professionals Professional[]
+  patients      Patient[]
+  appointments  Appointment[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  @@map("organizations")
+}
+
+enum MembershipRole {
+  OWNER // dono da conta / clínica
+  PROFESSIONAL // psicólogo
+  RECEPTIONIST // secretaria: agenda e contatos, sem acesso clínico
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String
+  emailVerifiedAt DateTime?
+  mfaEnabled      Boolean   @default(false)
+  mfaSecretEnc    String? // TOTP secret cifrado (AES-GCM)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  memberships         Membership[]
+  professional        Professional?
+  passwordResetTokens PasswordResetToken[]
+  accessLogs          AccessLog[]
+  auditLogs           AuditLog[]
+  clinicalNotes       ClinicalNote[]
+
+  @@map("users")
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole
+  createdAt      DateTime       @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@map("memberships")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+// ───────────────────────────────────────────────────────────────
+// PROFISSIONAL / CONSULTÓRIO
+// ───────────────────────────────────────────────────────────────
+
+enum Modality {
+  IN_PERSON
+  ONLINE
+  HYBRID // serviço aceita ambos; o agendamento concreto é IN_PERSON ou ONLINE
+}
+
+enum OnlinePlatform {
+  GOOGLE_MEET
+  ZOOM
+  TEAMS
+  OTHER
+}
+
+model Professional {
+  id             String  @id @default(cuid())
+  organizationId String
+  userId         String? @unique // null = perfil gerido pela clínica sem login próprio
+
+  // Identidade profissional
+  displayName String // "Dra. Ana"
+  fullName    String
+  crp         String // dado profissional — exibido só onde o profissional autorizar
+  showCrp     Boolean  @default(true)
+  photoUrl    String?
+  bio         String?
+  approaches  String[] // ex.: ["TCC", "Psicanálise"]
+  specialties String[] // ex.: ["Ansiedade", "Adolescentes"]
+
+  // Contato
+  phone     String?
+  whatsapp  String? // E.164, ex.: +5511999999999
+  email     String?
+  instagram String?
+  website   String?
+
+  // Endereço do consultório
+  addressLine  String?
+  addressCity  String?
+  addressState String?
+  addressZip   String?
+
+  // Página pública
+  slug       String  @unique // app.com.br/agendar/<slug>
+  showPrices Boolean @default(true)
+  isActive   Boolean @default(true)
+
+  // Atendimento online
+  onlinePlatform  OnlinePlatform?
+  onlineFixedLink String? // link fixo; se null, insere por sessão
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  services         Service[]
+  scheduleSettings ScheduleSettings?
+  policy           ProfessionalPolicy?
+  availability     AvailabilityRule[]
+  blocks           ScheduleBlock[]
+  exceptions       ScheduleException[]
+  appointments     Appointment[]
+  recurringSeries  RecurringSeries[]
+  clinicalNotes    ClinicalNote[]
+
+  @@index([organizationId])
+  @@map("professionals")
+}
+
+model Service {
+  id                  String   @id @default(cuid())
+  professionalId      String
+  name                String
+  description         String?
+  durationMinutes     Int
+  priceCents          Int
+  modality            Modality
+  isActive            Boolean  @default(true)
+  patientInstructions String? // orientações enviadas ao paciente
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  professional    Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+  recurringSeries RecurringSeries[]
+
+  @@index([professionalId, isActive])
+  @@map("services")
+}
+
+// ───────────────────────────────────────────────────────────────
+// CONFIGURAÇÃO DE AGENDA
+// ───────────────────────────────────────────────────────────────
+
+model ScheduleSettings {
+  id             String @id @default(cuid())
+  professionalId String @unique
+
+  defaultDurationMinutes Int  @default(50)
+  bufferMinutes          Int  @default(10) // intervalo entre sessões
+  slotStepMinutes        Int  @default(30) // granularidade dos horários oferecidos
+  minAdvanceHours        Int  @default(24) // antecedência mínima p/ agendar
+  minCancelHours         Int  @default(24)
+  minRescheduleHours     Int  @default(24)
+  maxSessionsPerDay      Int? // null = sem limite
+  lateToleranceMinutes   Int  @default(15)
+  maxBookingDaysAhead    Int  @default(60) // janela máxima visível na página pública
+
+  updatedAt DateTime @updatedAt
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@map("schedule_settings")
+}
+
+model ProfessionalPolicy {
+  id             String @id @default(cuid())
+  professionalId String @unique
+
+  cancellationPolicy String?
+  noShowPolicy       String?
+  reschedulePolicy   String?
+  confirmationPolicy String?
+  onlineInstructions String?
+  paymentInfo        String?
+  terms              String?
+
+  updatedAt DateTime @updatedAt
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@map("professional_policies")
+}
+
+/// Grade semanal recorrente. weekday: 0=domingo … 6=sábado.
+model AvailabilityRule {
+  id             String @id @default(cuid())
+  professionalId String
+  weekday        Int
+  startTime      String // "HH:mm" no fuso da organização
+  endTime        String
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, weekday])
+  @@map("availability_rules")
+}
+
+enum BlockType {
+  BLOCK // bloqueio pontual
+  DAY_OFF // folga
+  VACATION // férias
+}
+
+/// Períodos em que o profissional NÃO atende (sobrepõe a grade semanal).
+model ScheduleBlock {
+  id             String    @id @default(cuid())
+  professionalId String
+  type           BlockType @default(BLOCK)
+  startsAt       DateTime
+  endsAt         DateTime
+  reason         String?
+  createdAt      DateTime  @default(now())
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, startsAt, endsAt])
+  @@map("schedule_blocks")
+}
+
+/// Horário excepcional: atende em data/horário fora da grade semanal.
+model ScheduleException {
+  id             String   @id @default(cuid())
+  professionalId String
+  date           DateTime @db.Date
+  startTime      String
+  endTime        String
+  note           String?
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, date])
+  @@map("schedule_exceptions")
+}
+
+// ───────────────────────────────────────────────────────────────
+// PACIENTES (dados administrativos)
+// ───────────────────────────────────────────────────────────────
+
+enum FollowUpStatus {
+  ACTIVE
+  PAUSED
+  DISCHARGED // alta
+  INACTIVE
+}
+
+enum PaymentMethod {
+  PIX
+  CASH
+  CARD
+  TRANSFER
+  INSURANCE // convênio
+  OTHER
+}
+
+model Patient {
+  id             String @id @default(cuid())
+  organizationId String
+
+  name     String
+  whatsapp String // E.164
+  email    String?
+
+  usualModality          Modality?
+  followUpStatus         FollowUpStatus @default(ACTIVE)
+  adminNotes             String? // "prefere online", "precisa de recibo" — NUNCA conteúdo clínico
+  needsReceipt           Boolean        @default(false)
+  preferredPaymentMethod PaymentMethod?
+  bestContactTime        String?
+
+  firstAppointmentAt DateTime?
+  lgpdConsentAt      DateTime? // aceite dos termos no agendamento público
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime? // exclusão lógica (política de retenção LGPD)
+
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+  recurringSeries RecurringSeries[]
+  clinicalNotes   ClinicalNote[]
+  notifications   Notification[]
+  receipts        Receipt[]
+
+  @@unique([organizationId, whatsapp])
+  @@index([organizationId, name])
+  @@map("patients")
+}
+
+// ───────────────────────────────────────────────────────────────
+// AGENDAMENTOS
+// ───────────────────────────────────────────────────────────────
+
+enum AppointmentStatus {
+  PENDING // solicitado, aguardando ação
+  AWAITING_CONFIRMATION // mensagem enviada, aguardando paciente
+  CONFIRMED
+  CANCELLED_BY_PATIENT
+  CANCELLED_BY_PROFESSIONAL
+  RESCHEDULE_REQUESTED
+  COMPLETED
+  NO_SHOW
+  AWAITING_PAYMENT
+}
+
+enum AppointmentModality {
+  IN_PERSON
+  ONLINE
+}
+
+enum AppointmentSource {
+  PUBLIC_PAGE
+  MANUAL
+  RECURRING
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  WAIVED // isento / cortesia
+}
+
+enum RecurrenceFrequency {
+  WEEKLY
+  BIWEEKLY
+}
+
+model RecurringSeries {
+  id             String              @id @default(cuid())
+  professionalId String
+  patientId      String
+  serviceId      String
+  frequency      RecurrenceFrequency
+  weekday        Int
+  startTime      String // "HH:mm"
+  modality       AppointmentModality
+  startsOn       DateTime            @db.Date
+  endsOn         DateTime?           @db.Date
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  professional Professional  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient      Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  service      Service       @relation(fields: [serviceId], references: [id])
+  appointments Appointment[]
+
+  @@index([professionalId, isActive])
+  @@map("recurring_series")
+}
+
+model Appointment {
+  id             String  @id @default(cuid())
+  organizationId String
+  professionalId String
+  patientId      String
+  serviceId      String
+  seriesId       String?
+
+  startsAt DateTime
+  endsAt   DateTime
+  modality AppointmentModality
+  status   AppointmentStatus   @default(PENDING)
+  source   AppointmentSource   @default(MANUAL)
+
+  // Snapshot do serviço no momento do agendamento
+  serviceNameSnapshot String
+  priceCents          Int
+  durationMinutes     Int
+
+  // Observações
+  patientNote String? // texto livre do formulário público (não clínico)
+  adminNote   String? // observação administrativa do profissional
+
+  // Online
+  onlineLink String?
+
+  // Confirmação / cancelamento
+  confirmationToken String?   @unique // usado no link "confirmar" do WhatsApp
+  confirmedAt       DateTime?
+  cancelledAt       DateTime?
+  cancelReason      String?
+  completedAt       DateTime?
+
+  // Financeiro básico
+  paymentStatus PaymentStatus  @default(PENDING)
+  paymentMethod PaymentMethod?
+  paidAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional  Professional     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient       Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  service       Service          @relation(fields: [serviceId], references: [id])
+  series        RecurringSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  payments      Payment[]
+  notifications Notification[]
+  receipt       Receipt?
+  clinicalNotes ClinicalNote[]
+
+  @@index([professionalId, startsAt])
+  @@index([organizationId, startsAt])
+  @@index([patientId, startsAt])
+  @@index([status])
+  @@map("appointments")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  appointmentId String
+  amountCents   Int
+  method        PaymentMethod
+  paidAt        DateTime      @default(now())
+  note          String?
+  createdAt     DateTime      @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId])
+  @@map("payments")
+}
+
+/// Preparação para emissão de recibos (módulo futuro).
+model Receipt {
+  id            String   @id @default(cuid())
+  appointmentId String   @unique
+  patientId     String
+  number        String   @unique
+  amountCents   Int
+  issuedAt      DateTime @default(now())
+  pdfUrl        String?
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("receipts")
+}
+
+// ───────────────────────────────────────────────────────────────
+// NOTIFICAÇÕES / WHATSAPP
+// ───────────────────────────────────────────────────────────────
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+}
+
+enum NotificationType {
+  BOOKING_REQUEST
+  BOOKING_CONFIRMED
+  REMINDER_24H
+  REMINDER_2H
+  SESSION_LINK
+  CANCELLATION
+  RESCHEDULE
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Notification {
+  id             String  @id @default(cuid())
+  organizationId String
+  appointmentId  String?
+  patientId      String?
+
+  channel NotificationChannel
+  type    NotificationType
+  status  NotificationStatus  @default(QUEUED)
+
+  recipient         String // telefone E.164 ou e-mail
+  templateName      String? // nome do template aprovado na Meta
+  payload           Json // variáveis do template — NUNCA dados clínicos
+  providerMessageId String?   @unique
+  scheduledFor      DateTime  @default(now())
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  error             String?
+  attempts          Int       @default(0)
+  createdAt         DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  patient      Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledFor])
+  @@index([appointmentId])
+  @@map("notifications")
+}
+
+/// Eventos brutos recebidos do webhook da Meta (idempotência + auditoria).
+model WhatsAppWebhookEvent {
+  id          String    @id @default(cuid())
+  eventId     String?   @unique // wamid / id do status para deduplicação
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  error       String?
+
+  @@map("whatsapp_webhook_events")
+}
+
+// ───────────────────────────────────────────────────────────────
+// DADOS CLÍNICOS (módulo separado, cifrado, acesso restrito)
+// ───────────────────────────────────────────────────────────────
+
+/// Anotação clínica. `contentEnc` é cifrado com AES-256-GCM em src/lib/crypto.ts.
+/// Acesso controlado por src/lib/permissions.ts (canAccessClinicalData).
+model ClinicalNote {
+  id             String  @id @default(cuid())
+  patientId      String
+  professionalId String // profissional responsável
+  authorUserId   String // quem escreveu
+  appointmentId  String?
+
+  contentEnc String // base64: iv + tag + ciphertext
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  patient      Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professional Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  author       User                @relation(fields: [authorUserId], references: [id])
+  appointment  Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  accessLogs   ClinicalAccessLog[]
+
+  @@index([patientId, createdAt])
+  @@map("clinical_notes")
+}
+
+/// Toda leitura de dado clínico gera um registro — exigência de auditoria.
+model ClinicalAccessLog {
+  id             String   @id @default(cuid())
+  clinicalNoteId String
+  userId         String
+  action         String // READ | WRITE | DELETE
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  clinicalNote ClinicalNote @relation(fields: [clinicalNoteId], references: [id], onDelete: Cascade)
+
+  @@index([clinicalNoteId, createdAt])
+  @@map("clinical_access_logs")
+}
+
+// ───────────────────────────────────────────────────────────────
+// AUDITORIA
+// ───────────────────────────────────────────────────────────────
+
+/// Log de login (sucesso e falha).
+model AccessLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  success   Boolean
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+  @@map("access_logs")
+}
+
+/// Log de alterações em entidades de negócio.
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String // ex.: "appointment.confirm", "service.update"
+  entityType     String
+  entityId       String
+  before         Json?
+  after          Json?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

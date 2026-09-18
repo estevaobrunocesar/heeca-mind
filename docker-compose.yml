@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: hecca_psico_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hecca
+      POSTGRES_PASSWORD: hecca_dev
+      POSTGRES_DB: hecca_psico
+    ports:
+      - "5433:5432"
+    volumes:
+      - hecca_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hecca -d hecca_psico"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  hecca_pg_data:

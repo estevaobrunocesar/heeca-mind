@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV = [
+export const NAV = [
   { href: "/dashboard", label: "Início" },
   { href: "/agenda", label: "Agenda" },
   { href: "/pacientes", label: "Pacientes" },
@@ -15,7 +15,7 @@ const NAV = [
 export function Sidebar({ userName, publicUrl }: { userName: string; publicUrl: string | null }) {
   const pathname = usePathname();
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex">
       <div className="flex items-center gap-2 px-5 py-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-sm font-semibold text-primary">
           H

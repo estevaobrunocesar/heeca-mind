@@ -122,3 +122,9 @@ export function formatDateTimeBR(date: Date, tz: string): string {
 export function formatDateBR(date: Date, tz: string): string {
   return date.toLocaleDateString("pt-BR", { timeZone: tz, dateStyle: "short" });
 }
+
+/** "HH:mm" de um instante no fuso. */
+export function slotLabelInTz(date: Date, tz: string): string {
+  const p = partsInTz(date, tz);
+  return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+}

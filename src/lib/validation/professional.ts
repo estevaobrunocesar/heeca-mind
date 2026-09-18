@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { checkbox } from "./common";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { hhmmToMinutes, isHHmm } from "@/lib/time";
 
@@ -52,7 +53,7 @@ export const profileSchema = z.object({
     .transform((v) => v.replace(/\D/g, ""))
     .refine((v) => v.length >= 6 && v.length <= 8, "CRP inválido")
     .transform((v) => `${v.slice(0, 2)}/${v.slice(2)}`),
-  showCrp: z.union([z.literal("on"), z.undefined()]).transform((v) => v === "on"),
+  showCrp: checkbox,
   photoUrl: optionalUrl,
   bio: optionalText(1200),
   approaches: tagList,
@@ -90,7 +91,7 @@ export const profileSchema = z.object({
     .trim()
     .toLowerCase()
     .regex(SLUG_PATTERN, "Use apenas letras minúsculas, números e hífens (3 a 60 caracteres)"),
-  showPrices: z.union([z.literal("on"), z.undefined()]).transform((v) => v === "on"),
+  showPrices: checkbox,
   onlinePlatform: z
     .enum(["GOOGLE_MEET", "ZOOM", "TEAMS", "OTHER", ""])
     .transform((v) => (v === "" ? null : v)),

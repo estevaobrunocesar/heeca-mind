@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { checkbox } from "./common";
 import { parseBRLToCents } from "@/lib/money";
 
 const optionalText = (max: number) =>
@@ -29,9 +30,7 @@ export const serviceSchema = z.object({
     }),
   modality: z.enum(["IN_PERSON", "ONLINE", "HYBRID"], { message: "Escolha a modalidade" }),
   patientInstructions: optionalText(1000),
-  isActive: z
-    .union([z.literal("on"), z.literal("true"), z.literal("false"), z.undefined()])
-    .transform((v) => v === "on" || v === "true"),
+  isActive: checkbox,
 });
 
 export type ServiceInput = z.infer<typeof serviceSchema>;

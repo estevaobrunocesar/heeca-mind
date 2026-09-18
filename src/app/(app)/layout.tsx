@@ -1,4 +1,5 @@
 import { signOut } from "@/auth";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { Sidebar } from "@/components/layout/sidebar";
 import { db } from "@/lib/db";
 import { requireActor } from "@/lib/session";
@@ -17,8 +18,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       <Sidebar userName={user.name} publicUrl={publicUrl} />
-      <div className="flex flex-1 flex-col">
-        <header className="flex h-14 items-center justify-end border-b border-border bg-surface px-6">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:justify-end md:px-6">
+          <span className="font-semibold md:hidden">Hecca Psico</span>
           <form
             action={async () => {
               "use server";
@@ -30,7 +32,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </button>
           </form>
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <MobileNav />
+        <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { canOpenClinicalRecord, KIND_LABEL, listNotes, logExport } from "@/lib/clinical";
+import { canOpenClinicalRecord, DOCUMENT_KIND_LABEL, KIND_LABEL, listDocuments, listNotes, logExport } from "@/lib/clinical";
 import { db } from "@/lib/db";
+import { formatBytes } from "@/lib/document";
 import { requireActor } from "@/lib/session";
 import { formatDateBR, formatDateTimeBR } from "@/lib/time";
 
@@ -27,6 +28,7 @@ export default async function PrintClinicalRecordPage({ params }: PageProps<"/pa
   if (!patient) notFound();
   const tz = patient.organization.timezone;
   const notes = (await listNotes(actor, id)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const documents = (await listDocuments(actor, id)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   await logExport(actor, notes.map((n) => n.id));
 
   return (
@@ -42,7 +44,7 @@ export default async function PrintClinicalRecordPage({ params }: PageProps<"/pa
           <strong>Profissional:</strong> {pro.fullName} ({pro.displayName}) · CRP {pro.crp} · {patient.organization.name}
         </p>
         <p className="text-xs">
-          Emitido em {formatDateTimeBR(new Date(), tz)} · {notes.length} registro(s) · documento sigiloso (CFP, Código de Ética, art. 9)
+          Emitido em {formatDateTimeBR(new Date(), tz)} · {notes.length} registro(s) · {documents.length} anexo(s) · documento sigiloso (CFP, Código de Ética, art. 9)
         </p>
       </header>
 
@@ -56,6 +58,21 @@ export default async function PrintClinicalRecordPage({ params }: PageProps<"/pa
           <p className="mt-1 whitespace-pre-wrap">{n.content}</p>
         </article>
       ))}
+
+      {documents.length > 0 && (
+        <section className="mt-8 break-inside-avoid">
+          <h2 className="mb-2 text-sm font-semibold">Anexos ({documents.length}) — arquivos entregues em separado</h2>
+          <ol className="list-decimal space-y-1 pl-5">
+            {documents.map((d) => (
+              <li key={d.id}>
+                <strong>{DOCUMENT_KIND_LABEL[d.kind]}</strong> — {d.title} · {d.fileName} ({formatBytes(d.sizeBytes)}) · {formatDateTimeBR(d.createdAt, tz)}
+                {d.appointment && <> · sessão de {formatDateTimeBR(d.appointment.startsAt, tz)}</>}
+                {d.description && <span className="block text-neutral-600">{d.description}</span>}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       <footer className="mt-10 border-t border-black pt-3 text-xs">
         <p>_____________________________________________</p>

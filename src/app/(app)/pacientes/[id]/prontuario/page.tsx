@@ -3,10 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
-import { canOpenClinicalRecord, KIND_LABEL, listNotes, recentAccess, sessionsWithoutEvolution } from "@/lib/clinical";
+import { canOpenClinicalRecord, DOCUMENT_KIND_LABEL, KIND_LABEL, listDocuments, listNotes, recentAccess, sessionsWithoutEvolution, treatedSessions } from "@/lib/clinical";
 import { db } from "@/lib/db";
+import { formatBytes } from "@/lib/document";
 import { requireActor } from "@/lib/session";
 import { formatDateTimeBR } from "@/lib/time";
+import { DeleteDocumentForm, UploadDocumentForm } from "./document-forms";
 import { DeleteNoteForm, NewNoteForm } from "./note-forms";
 
 export const metadata: Metadata = { title: "Prontuário" };
@@ -46,7 +48,13 @@ export default async function ClinicalRecordPage({ params, searchParams }: PageP
     );
   }
 
-  const [notes, sessions, access] = await Promise.all([listNotes(actor, id), sessionsWithoutEvolution(actor, id), recentAccess(actor, id)]);
+  const [notes, sessions, access, documents, allSessions] = await Promise.all([
+    listNotes(actor, id),
+    sessionsWithoutEvolution(actor, id),
+    recentAccess(actor, id),
+    listDocuments(actor, id),
+    treatedSessions(actor, id),
+  ]);
   const defaultAppointmentId = typeof sp.sessao === "string" && sessions.some((s) => s.id === sp.sessao) ? sp.sessao : undefined;
 
   return (
@@ -59,7 +67,7 @@ export default async function ClinicalRecordPage({ params, searchParams }: PageP
             <Link href={`/pacientes/${id}`} className="btn-ghost">
               ← Ficha
             </Link>
-            {notes.length > 0 && (
+            {(notes.length > 0 || documents.length > 0) && (
               <a href={`/pacientes/${id}/prontuario/imprimir`} target="_blank" rel="noreferrer" className="btn-ghost">
                 Imprimir / PDF
               </a>
@@ -107,9 +115,48 @@ export default async function ClinicalRecordPage({ params, searchParams }: PageP
         </div>
 
         <aside className="space-y-4">
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Documentos · {documents.length}</h2>
+            </div>
+            <UploadDocumentForm patientId={id} sessions={allSessions.map((s) => ({ id: s.id, label: `${formatDateTimeBR(s.startsAt, tz)} · ${s.serviceNameSnapshot}` }))} />
+            {documents.length === 0 ? (
+              <p className="text-xs text-text-muted">Laudos, encaminhamentos, declarações, termos assinados e exames ficam aqui, cifrados.</p>
+            ) : (
+              <ul className="space-y-2">
+                {documents.map((d) => (
+                  <li key={d.id} className="card space-y-1 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary">{DOCUMENT_KIND_LABEL[d.kind]}</span>
+                        <p className="mt-1 truncate text-sm font-medium" title={d.title}>
+                          {d.title}
+                        </p>
+                        {d.description && <p className="text-xs text-text-muted">{d.description}</p>}
+                        <p className="text-xs text-text-muted">
+                          {formatDateTimeBR(d.createdAt, tz)} · {formatBytes(d.sizeBytes)} · {d.authorName}
+                          {d.appointment && <> · sessão de {formatDateTimeBR(d.appointment.startsAt, tz)}</>}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <a href={`/pacientes/${id}/prontuario/documentos/${d.id}`} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                        Abrir
+                      </a>
+                      <a href={`/pacientes/${id}/prontuario/documentos/${d.id}?download=1`} className="text-text-muted hover:text-primary">
+                        Baixar
+                      </a>
+                      <DeleteDocumentForm patientId={id} documentId={d.id} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
           <section className="card">
             <h2 className="text-base font-semibold">Acessos recentes</h2>
-            <p className="mt-1 text-xs text-text-muted">Quem abriu, registrou, excluiu ou imprimiu este prontuário.</p>
+            <p className="mt-1 text-xs text-text-muted">Quem abriu, registrou, excluiu ou imprimiu notas e documentos deste prontuário.</p>
             {access.length === 0 ? (
               <p className="mt-3 text-sm text-text-muted">Nenhum acesso registrado.</p>
             ) : (

@@ -32,7 +32,7 @@ export class S3StorageProvider implements StorageProvider {
     return { url, path: `/${encoded}` };
   }
 
-  private async request(method: "PUT" | "DELETE", key: string, body?: Buffer, extra: Record<string, string> = {}) {
+  private async request(method: "PUT" | "DELETE" | "GET", key: string, body?: Buffer, extra: Record<string, string> = {}): Promise<Response> {
     const { url, path } = this.objectUrl(key);
     const payloadHash = sha256Hex(body ?? "");
     const amzDate = amzDateNow();
@@ -54,9 +54,10 @@ export class S3StorageProvider implements StorageProvider {
       amzDate,
     });
     const res = await fetch(url, { method, headers: { ...headers, authorization }, body: body ? new Uint8Array(body) : undefined });
-    if (!res.ok && !(method === "DELETE" && res.status === 404)) {
+    if (!res.ok && !(method !== "PUT" && res.status === 404)) {
       throw new Error(`S3 ${method} ${res.status}: ${(await res.text()).slice(0, 300)}`);
     }
+    return res;
   }
 
   async put(input: PutInput) {
@@ -69,6 +70,23 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   async delete(key: string) {
+    await this.request("DELETE", key);
+  }
+
+  /** Privado no S3 = mesmo bucket, sem cache e sem URL. O conteúdo chega cifrado; o bucket pode até ser público. */
+  async putPrivate(key: string, body: Buffer) {
+    const k = fullKey(key);
+    await this.request("PUT", k, body, { "content-type": "application/octet-stream", "cache-control": "private, no-store" });
+    return { key: k };
+  }
+
+  async getPrivate(key: string) {
+    const res = await this.request("GET", key);
+    if (res.status === 404) return null;
+    return Buffer.from(await res.arrayBuffer());
+  }
+
+  async deletePrivate(key: string) {
     await this.request("DELETE", key);
   }
 

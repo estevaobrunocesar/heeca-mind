@@ -53,7 +53,7 @@ COPY --from=prisma-cli --chown=app:app /prisma-cli/node_modules ./prisma-cli/nod
 # prisma.config.ts importa dotenv/config; o loader do config não usa NODE_PATH
 COPY --from=prisma-cli --chown=app:app /prisma-cli/node_modules/dotenv ./node_modules/dotenv
 COPY --chown=app:app docker/entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh && mkdir -p public/uploads && chown app:app public/uploads
+RUN chmod +x ./entrypoint.sh && mkdir -p public/uploads storage/private && chown app:app public/uploads storage/private
 
 USER app
 EXPOSE 3000

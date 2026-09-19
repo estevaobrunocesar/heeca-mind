@@ -5,7 +5,7 @@ Dois caminhos, mesmo código. Escolha um.
 | | Vercel (serverless) | Docker num VPS |
 |---|---|---|
 | Banco | Postgres gerenciado com **pooler** (Neon, Supabase, RDS Proxy) | Postgres do `docker-compose.prod.yml` (volume `pg_data`) |
-| Arquivos (fotos) | `STORAGE_DRIVER=s3` obrigatório (Cloudflare R2 / S3) | `local` (volume `uploads`) ou `s3` |
+| Arquivos (fotos, documentos clínicos) | `STORAGE_DRIVER=s3` obrigatório (Cloudflare R2 / S3) | `local` (volumes `uploads` e `private`) ou `s3` |
 | Cron (WhatsApp, expirações, LGPD) | `vercel.json` já agenda `/api/cron` a cada minuto | serviço `cron` do compose |
 | TLS | automático | Caddy/Traefik/Nginx na frente de `app:3000` |
 | Migrações | `npm run db:deploy` no build ou manualmente | `entrypoint.sh` roda `migrate deploy` a cada start |
@@ -29,6 +29,7 @@ openssl rand -hex 24      # CRON_SECRET
 | `CRON_SECRET` | sim (prod) | `Authorization: Bearer` do `/api/cron`. |
 | `AUTH_TRUST_HOST` | Docker | `true` atrás de proxy (fora da Vercel). |
 | `STORAGE_DRIVER` | | `local` (default) ou `s3`. |
+| `PRIVATE_STORAGE_DIR` | | Driver local: pasta dos documentos clínicos (blobs cifrados). Default `./storage/private`, fora de `public/`. |
 | `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_PUBLIC_URL` | se s3 | R2: `S3_REGION=auto`, `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`, `S3_PUBLIC_URL` = domínio público do bucket. Chaves levam prefixo `hecca-psico/` (bucket pode ser compartilhado entre produtos Heeca). |
 | `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` | para enviar de verdade | Sem elas, mensagens vão para o log. Ver `docs/WHATSAPP.md`. |
 | `POSTGRES_PASSWORD` | compose | Senha do Postgres do compose. |
@@ -44,7 +45,7 @@ A aplicação **valida tudo isso na inicialização** (`src/lib/env.ts`) e se re
 4. Deploy. O cron passa a chamar `/api/cron` a cada minuto com o `CRON_SECRET`.
 5. Aponte o domínio e confira `https://<app>/api/health` → `{"status":"ok","db":"ok"}`.
 
-Limites conhecidos na Vercel: Server Actions até 3 MB (upload da foto já é reduzido no cliente); funções com timeout padrão (o cron processa em lotes de 50).
+Limites conhecidos na Vercel: Server Actions até 10 MB no `next.config.ts` (a foto é reduzida no cliente; documentos clínicos até 8 MB — confira o limite de body do plano); funções com timeout padrão (o cron processa em lotes de 50).
 
 ## 3. Docker / VPS
 
@@ -66,7 +67,7 @@ app.heeca.com.br {
 
 Atualizar: `git pull && docker compose -f docker-compose.prod.yml up -d --build`. As migrações rodam no start.
 
-Backups: `docker compose -f docker-compose.prod.yml exec db pg_dump -U hecca hecca_psico | gzip > backup-$(date +%F).sql.gz` — agende diariamente e copie para fora do servidor. O volume `uploads` também precisa de backup se `STORAGE_DRIVER=local`.
+Backups: `docker compose -f docker-compose.prod.yml exec db pg_dump -U hecca hecca_psico | gzip > backup-$(date +%F).sql.gz` — agende diariamente e copie para fora do servidor. Os volumes `uploads` e `private` também precisam de backup se `STORAGE_DRIVER=local`. Os blobs de `private` são cifrados com `ENCRYPTION_KEY`: sem a chave, o backup é inútil; sem o backup do banco (linha com `storageKey`), o blob é inalcançável.
 
 ## 4. Primeiro acesso
 

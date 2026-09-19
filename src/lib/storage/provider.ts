@@ -26,6 +26,15 @@ export interface StorageProvider {
   delete(key: string): Promise<void>;
   /** URL pública de uma chave já gravada. */
   urlFor(key: string): string;
+
+  /**
+   * Objetos privados (documentos clínicos): nunca ganham URL; só o servidor
+   * lê, via getPrivate, depois de autorizar. O chamador grava o conteúdo já
+   * cifrado — o driver não sabe (nem precisa) se o bucket é público.
+   */
+  putPrivate(key: string, body: Buffer): Promise<{ key: string }>;
+  getPrivate(key: string): Promise<Buffer | null>;
+  deletePrivate(key: string): Promise<void>;
 }
 
 export function fullKey(key: string): string {

@@ -118,7 +118,8 @@ prisma/                schema, migrations, seed
 - `src/lib/storage/`: interface `StorageProvider`, drivers `local` (public/uploads, dev e VPS) e `s3` (SigV4 manual, testado contra o vetor da AWS; funciona com S3/R2/MinIO). `STORAGE_DRIVER` escolhe.
 - Toda chave leva o prefixo `hecca-psico/` — o bucket pode ser compartilhado entre os produtos Heeca.
 - Foto de perfil: recorte quadrado + resize 512px no navegador (canvas, sem `sharp`); servidor valida magic bytes (`src/lib/image.ts`) e 1,5 MB. SVG é recusado (pode carregar script). Chave com timestamp → cache imutável; a anterior é apagada em melhor esforço. `Professional.photoKey` guarda a chave para exclusão.
-- Server Actions aceitam até 3 MB (`next.config.ts`).
+- Server Actions aceitam até 10 MB (`next.config.ts`) — documentos clínicos vão até 8 MB.
+- **Objetos privados** (`putPrivate/getPrivate/deletePrivate`): nunca ganham URL. Driver local grava em `storage/private/` (fora de `public/`; `PRIVATE_STORAGE_DIR` aponta o volume em produção); S3 usa o mesmo bucket com `cache-control: private, no-store`. O chamador grava o conteúdo **já cifrado** — a confidencialidade vem da chave, não do bucket.
 
 ## LGPD — retenção e anonimização
 
@@ -168,3 +169,12 @@ prisma/                schema, migrations, seed
 - Notas são imutáveis; exclusão é lógica com motivo e mantém o conteúdo cifrado até a anonimização LGPD (dever de guarda, CFP 001/2009).
 - Tipos: EVOLUTION (vinculada a sessão; uma por sessão), NOTE, ASSESSMENT. `/pacientes/[id]/prontuario/imprimir` gera a versão para PDF e registra EXPORT.
 - Verificação de leitura: `pg_dump | grep <palavra da nota>` deve dar 0.
+
+## Documentos clínicos (anexos do prontuário)
+
+- `ClinicalDocument`: PDF/JPG/PNG/WebP até 8 MB, tipo identificado por magic bytes (`src/lib/document.ts`, puro e testado). SVG, Office e HTML são recusados — exportar em PDF.
+- O arquivo é cifrado com `encryptBytes` (AES-GCM, mesma chave) **antes** de ir ao storage privado; título, descrição e nome do arquivo também são cifrados. Em claro no banco só `kind`, `contentType`, `sizeBytes` e `storageKey`.
+- Mesma regra de acesso das notas (`requireClinicalAccess`). Entrega só por `GET /pacientes/[id]/prontuario/documentos/[docId]` (route handler), que decifra e responde com `Content-Disposition`, `no-store` e `CSP: sandbox` — um PDF com script não age nesta origem. `?download=1` força download.
+- Log: WRITE no upload, READ ao abrir/baixar (não ao listar — listar decifra só metadados), DELETE na exclusão. `ClinicalAccessLog` aponta para nota **ou** documento.
+- Exclusão é lógica com motivo; o blob fica até a anonimização, que apaga linhas (na transação) e blobs (depois, via `purgeDocumentBlobs`; falhas vão para o log do cron e para o `audit.after.blobsFailed`). `npm run check:lgpd` cobre linha + blob.
+- A impressão lista os anexos como índice ("entregues em separado"); não embute o conteúdo.

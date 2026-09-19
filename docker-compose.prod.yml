@@ -30,6 +30,7 @@ services:
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
     volumes:
       - uploads:/app/public/uploads
+      - private:/app/storage/private
     depends_on:
       db:
         condition: service_healthy
@@ -54,3 +55,4 @@ services:
 volumes:
   pg_data:
   uploads:
+  private:

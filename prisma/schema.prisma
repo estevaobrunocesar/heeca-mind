@@ -27,15 +27,15 @@ enum OrganizationType {
 }
 
 model Organization {
-  id        String           @id @default(cuid())
-  name      String
-  type      OrganizationType @default(SOLO)
-  slug      String?          @unique // página pública da clínica: /clinica/<slug>
-  timezone  String           @default("America/Sao_Paulo")
+  id             String           @id @default(cuid())
+  name           String
+  type           OrganizationType @default(SOLO)
+  slug           String?          @unique // página pública da clínica: /clinica/<slug>
+  timezone       String           @default("America/Sao_Paulo")
   /// Anos de guarda após o último atendimento/exclusão antes de anonimizar (CFP: mínimo 5).
-  retentionYears Int          @default(5)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  retentionYears Int              @default(5)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   memberships   Membership[]
   professionals Professional[]
@@ -55,19 +55,19 @@ enum MembershipRole {
 }
 
 model User {
-  id              String    @id @default(cuid())
-  email           String    @unique
-  passwordHash    String
-  name            String
-  emailVerifiedAt DateTime?
-  mfaEnabled      Boolean   @default(false)
-  mfaSecretEnc    String? // TOTP secret cifrado (AES-GCM); presente antes de mfaEnabled durante a ativação
-  mfaEnabledAt    DateTime?
-  mfaRecoveryHashes String[] @default([]) // sha256 dos códigos de recuperação ainda não usados
-  isActive        Boolean   @default(true)
-  lastLoginAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  name              String
+  emailVerifiedAt   DateTime?
+  mfaEnabled        Boolean   @default(false)
+  mfaSecretEnc      String? // TOTP secret cifrado (AES-GCM); presente antes de mfaEnabled durante a ativação
+  mfaEnabledAt      DateTime?
+  mfaRecoveryHashes String[]  @default([]) // sha256 dos códigos de recuperação ainda não usados
+  isActive          Boolean   @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   memberships         Membership[]
   professional        Professional?
@@ -77,6 +77,7 @@ model User {
   accessLogs          AccessLog[]
   auditLogs           AuditLog[]
   clinicalNotes       ClinicalNote[]
+  clinicalDocuments   ClinicalDocument[]
 
   @@map("users")
 }
@@ -219,17 +220,18 @@ model Professional {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user             User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  services         Service[]
-  scheduleSettings ScheduleSettings?
-  policy           ProfessionalPolicy?
-  availability     AvailabilityRule[]
-  blocks           ScheduleBlock[]
-  exceptions       ScheduleException[]
-  appointments     Appointment[]
-  recurringSeries  RecurringSeries[]
-  clinicalNotes    ClinicalNote[]
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user              User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  services          Service[]
+  scheduleSettings  ScheduleSettings?
+  policy            ProfessionalPolicy?
+  availability      AvailabilityRule[]
+  blocks            ScheduleBlock[]
+  exceptions        ScheduleException[]
+  appointments      Appointment[]
+  recurringSeries   RecurringSeries[]
+  clinicalNotes     ClinicalNote[]
+  clinicalDocuments ClinicalDocument[]
 
   @@index([organizationId])
   @@map("professionals")
@@ -265,16 +267,16 @@ model ScheduleSettings {
   id             String @id @default(cuid())
   professionalId String @unique
 
-  defaultDurationMinutes Int  @default(50)
-  bufferMinutes          Int  @default(10) // intervalo entre sessões
-  slotStepMinutes        Int  @default(30) // granularidade dos horários oferecidos
-  minAdvanceHours        Int  @default(24) // antecedência mínima p/ agendar
-  minCancelHours         Int  @default(24)
-  minRescheduleHours     Int  @default(24)
-  maxSessionsPerDay      Int? // null = sem limite
-  lateToleranceMinutes   Int  @default(15)
-  maxBookingDaysAhead    Int  @default(60) // janela máxima visível na página pública
-  confirmationTimeoutHours Int @default(24) // solicitação pública expira se não confirmada
+  defaultDurationMinutes   Int  @default(50)
+  bufferMinutes            Int  @default(10) // intervalo entre sessões
+  slotStepMinutes          Int  @default(30) // granularidade dos horários oferecidos
+  minAdvanceHours          Int  @default(24) // antecedência mínima p/ agendar
+  minCancelHours           Int  @default(24)
+  minRescheduleHours       Int  @default(24)
+  maxSessionsPerDay        Int? // null = sem limite
+  lateToleranceMinutes     Int  @default(15)
+  maxBookingDaysAhead      Int  @default(60) // janela máxima visível na página pública
+  confirmationTimeoutHours Int  @default(24) // solicitação pública expira se não confirmada
 
   updatedAt DateTime @updatedAt
 
@@ -395,12 +397,13 @@ model Patient {
   deletedAt          DateTime? // exclusão lógica (política de retenção LGPD)
   anonymizedAt       DateTime? // anonimização irreversível após o prazo de retenção
 
-  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  appointments    Appointment[]
-  recurringSeries RecurringSeries[]
-  clinicalNotes   ClinicalNote[]
-  notifications   Notification[]
-  receipts        Receipt[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointments      Appointment[]
+  recurringSeries   RecurringSeries[]
+  clinicalNotes     ClinicalNote[]
+  clinicalDocuments ClinicalDocument[]
+  notifications     Notification[]
+  receipts          Receipt[]
 
   @@unique([organizationId, whatsapp])
   @@index([organizationId, name])
@@ -511,15 +514,16 @@ model Appointment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  professional  Professional     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
-  patient       Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  service       Service          @relation(fields: [serviceId], references: [id])
-  series        RecurringSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  payments      Payment[]
-  notifications Notification[]
-  receipt       Receipt?
-  clinicalNotes ClinicalNote[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional      Professional       @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient           Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  service           Service            @relation(fields: [serviceId], references: [id])
+  series            RecurringSeries?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  payments          Payment[]
+  notifications     Notification[]
+  receipt           Receipt?
+  clinicalNotes     ClinicalNote[]
+  clinicalDocuments ClinicalDocument[]
 
   @@index([professionalId, startsAt])
   @@index([organizationId, startsAt])
@@ -650,11 +654,11 @@ model ClinicalNote {
   authorUserId   String // quem escreveu
   appointmentId  String?
 
-  kind       ClinicalNoteKind @default(NOTE)
-  contentEnc String // base64: iv + tag + ciphertext
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
+  kind          ClinicalNoteKind @default(NOTE)
+  contentEnc    String // base64: iv + tag + ciphertext
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  deletedAt     DateTime?
   deletedReason String?
 
   patient      Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -669,17 +673,63 @@ model ClinicalNote {
 
 /// Toda leitura de dado clínico gera um registro — exigência de auditoria.
 model ClinicalAccessLog {
-  id             String   @id @default(cuid())
-  clinicalNoteId String
-  userId         String
-  action         String // READ | WRITE | DELETE
-  ip             String?
-  createdAt      DateTime @default(now())
+  id                 String   @id @default(cuid())
+  clinicalNoteId     String?
+  clinicalDocumentId String?
+  userId             String
+  action             String // READ | WRITE | DELETE | EXPORT
+  ip                 String?
+  createdAt          DateTime @default(now())
 
-  clinicalNote ClinicalNote @relation(fields: [clinicalNoteId], references: [id], onDelete: Cascade)
+  clinicalNote     ClinicalNote?     @relation(fields: [clinicalNoteId], references: [id], onDelete: Cascade)
+  clinicalDocument ClinicalDocument? @relation(fields: [clinicalDocumentId], references: [id], onDelete: Cascade)
 
   @@index([clinicalNoteId, createdAt])
+  @@index([clinicalDocumentId, createdAt])
   @@map("clinical_access_logs")
+}
+
+enum ClinicalDocumentKind {
+  REPORT // laudo / relatório psicológico
+  REFERRAL // encaminhamento
+  DECLARATION // declaração de comparecimento
+  CERTIFICATE // atestado
+  CONSENT // termo de consentimento assinado
+  EXAM // exame / documento externo trazido pelo paciente
+  OTHER
+}
+
+/// Anexo do prontuário (PDF ou imagem). O arquivo fica no storage CIFRADO
+/// (AES-GCM, src/lib/crypto.ts) — o bucket/disco nunca vê o conteúdo em claro.
+/// Título, descrição e nome do arquivo também são cifrados: só kind, tipo e
+/// tamanho ficam legíveis no banco.
+model ClinicalDocument {
+  id             String  @id @default(cuid())
+  patientId      String
+  professionalId String // profissional responsável
+  authorUserId   String
+  appointmentId  String?
+
+  kind           ClinicalDocumentKind @default(OTHER)
+  titleEnc       String
+  descriptionEnc String?
+  fileNameEnc    String
+  contentType    String // application/pdf | image/jpeg | image/png | image/webp
+  sizeBytes      Int // do arquivo original (o blob cifrado tem +28 bytes)
+  storageKey     String               @unique
+
+  createdAt     DateTime  @default(now())
+  deletedAt     DateTime?
+  deletedReason String?
+
+  patient      Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professional Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  author       User                @relation(fields: [authorUserId], references: [id])
+  appointment  Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  accessLogs   ClinicalAccessLog[]
+
+  @@index([patientId, createdAt])
+  @@map("clinical_documents")
 }
 
 // ───────────────────────────────────────────────────────────────

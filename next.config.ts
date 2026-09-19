@@ -15,8 +15,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
     serverActions: {
-      // Upload da foto de perfil (já redimensionada no cliente) passa por Server Action.
-      bodySizeLimit: "3mb",
+      // Foto de perfil (redimensionada no cliente) e documentos clínicos (até 8 MB) passam por Server Action.
+      bodySizeLimit: "10mb",
     },
   },
   async headers() {

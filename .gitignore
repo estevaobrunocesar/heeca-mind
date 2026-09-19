@@ -44,3 +44,6 @@ src/generated/
 
 # uploads do driver local de storage
 public/uploads/
+
+# documentos clínicos do driver local (cifrados, mas fora do repositório)
+storage/

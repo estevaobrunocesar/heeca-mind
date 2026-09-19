@@ -2,7 +2,8 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { anonymizeExpiredPatients } from "../src/lib/lgpd/anonymize";
-import { encrypt } from "../src/lib/crypto";
+import { encrypt, encryptBytes } from "../src/lib/crypto";
+import { getStorage } from "../src/lib/storage";
 
 /**
  * Verificação de integração da anonimização, no banco local.
@@ -11,13 +12,13 @@ import { encrypt } from "../src/lib/crypto";
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
 async function main() {
-  const org = await db.organization.findFirstOrThrow({ include: { professionals: { take: 1, include: { services: { take: 1 }, user: true } } } });
-  const pro = org.professionals[0];
+  const pro = await db.professional.findFirstOrThrow({ where: { services: { some: {} } }, include: { services: { take: 1 }, user: true } });
+  const org = await db.organization.findUniqueOrThrow({ where: { id: pro.organizationId }, select: { id: true, retentionYears: true } });
   const service = pro.services[0];
+  // Paciente "antigo": última sessão e exclusão há (retenção + 1) anos.
   const sixYearsAgo = new Date();
-  sixYearsAgo.setUTCFullYear(sixYearsAgo.getUTCFullYear() - 6);
+  sixYearsAgo.setUTCFullYear(sixYearsAgo.getUTCFullYear() - (org.retentionYears + 1));
 
-  // Paciente "antigo": última sessão e exclusão há 6 anos (retenção 5).
   const patient = await db.patient.create({
     data: {
       organizationId: org.id,
@@ -51,6 +52,21 @@ async function main() {
   await db.clinicalNote.create({
     data: { patientId: patient.id, professionalId: pro.id, authorUserId: pro.user!.id, appointmentId: appt.id, contentEnc: encrypt("conteúdo clínico sigiloso") },
   });
+  // Documento clínico: blob cifrado no storage privado + linha.
+  const storage = getStorage();
+  const { key: docKey } = await storage.putPrivate(`clinical/${patient.id}/lgpd-check.bin`, encryptBytes(Buffer.from("%PDF-1.4 laudo sigiloso")));
+  await db.clinicalDocument.create({
+    data: {
+      patientId: patient.id,
+      professionalId: pro.id,
+      authorUserId: pro.user!.id,
+      titleEnc: encrypt("Laudo"),
+      fileNameEnc: encrypt("laudo.pdf"),
+      contentType: "application/pdf",
+      sizeBytes: 23,
+      storageKey: docKey,
+    },
+  });
   await db.notification.create({
     data: { organizationId: org.id, appointmentId: appt.id, patientId: patient.id, channel: "WHATSAPP", type: "BOOKING_CONFIRMED", status: "SENT", recipient: patient.whatsapp, payload: { bodyVariables: ["Fulana"] } },
   });
@@ -65,6 +81,8 @@ async function main() {
   const p = await db.patient.findUniqueOrThrow({ where: { id: patient.id } });
   const a = await db.appointment.findUniqueOrThrow({ where: { id: appt.id }, include: { payments: true } });
   const notes = await db.clinicalNote.count({ where: { patientId: patient.id } });
+  const docs = await db.clinicalDocument.count({ where: { patientId: patient.id } });
+  const blob = await storage.getPrivate(docKey);
   const n = await db.notification.findFirstOrThrow({ where: { patientId: patient.id } });
   const logs = await db.auditLog.findMany({ where: { entityType: "Patient", entityId: patient.id }, orderBy: { createdAt: "asc" } });
   const r = await db.patient.findUniqueOrThrow({ where: { id: recent.id } });
@@ -76,6 +94,7 @@ async function main() {
     ["textos da sessão removidos", a.patientNote === null && a.adminNote === null && a.confirmationToken === null],
     ["pagamento mantido sem observação", a.payments.length === 1 && a.payments[0].note === null],
     ["notas clínicas apagadas", notes === 0],
+    ["documentos clínicos apagados (linha e blob)", docs === 0 && blob === null],
     ["notificação sem destinatário/payload", n.recipient === "anonimizado" && JSON.stringify(n.payload) === "{}"],
     ["auditoria antiga sem before/after, rastro mantido", logs[0].before === null && logs[0].after === null && logs.some((l) => l.action === "patient.anonymize")],
     ["recente intocado", r.anonymizedAt === null && r.name === "Recente"],
@@ -84,6 +103,7 @@ async function main() {
   for (const [label, ok] of checks) console.log(ok ? "✔" : "✖", label);
 
   await db.patient.deleteMany({ where: { id: { in: [patient.id, recent.id] } } });
+  await storage.deletePrivate(docKey).catch(() => {}); // se o job não rodou, o blob de teste não pode ficar
   if (checks.some(([, ok]) => !ok)) process.exit(1);
 }
 

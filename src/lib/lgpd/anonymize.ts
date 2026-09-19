@@ -1,5 +1,6 @@
 import "server-only";
 import { audit } from "@/lib/audit";
+import { purgeDocumentBlobs } from "@/lib/clinical";
 import { db } from "@/lib/db";
 import { isAnonymizationDue } from "./retention";
 
@@ -23,6 +24,9 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
 
   const appointmentIds = patient.appointments.map((a) => a.id);
   const now = new Date();
+  // Blobs dos documentos clínicos: apagados do storage DEPOIS da transação
+  // (storage não faz rollback). Se a transação falhar, nada foi apagado.
+  const documentKeys = (await db.clinicalDocument.findMany({ where: { patientId }, select: { storageKey: true } })).map((d) => d.storageKey);
 
   await db.$transaction(async (tx) => {
     await tx.patient.update({
@@ -52,20 +56,27 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
       where: { OR: [{ patientId }, { appointmentId: { in: appointmentIds } }] },
       data: { recipient: "anonimizado", payload: {}, error: null },
     });
-    // Notas clínicas: fim do prazo de guarda = fim do registro.
+    // Notas e documentos clínicos: fim do prazo de guarda = fim do registro.
     await tx.clinicalNote.deleteMany({ where: { patientId } });
+    await tx.clinicalDocument.deleteMany({ where: { patientId } });
     await tx.recurringSeries.updateMany({ where: { patientId }, data: { isActive: false } });
     // Auditoria: mantém o rastro (quem, quando, qual ação), remove o conteúdo.
     // SQL direto: updateMany do Prisma não aceita NULL literal em campos Json.
     await tx.$executeRaw`UPDATE audit_logs SET "before" = NULL, "after" = NULL WHERE ("entityType" = 'Patient' AND "entityId" = ${patientId}) OR ("entityType" = 'Appointment' AND "entityId" = ANY(${appointmentIds}::text[]))`;
   });
 
+  const blobsFailed = await purgeDocumentBlobs(documentKeys);
+  if (blobsFailed.length > 0) {
+    // Linhas já sumiram; o blob é cifrado e sem chave de lookup. Fica registrado para limpeza manual.
+    console.error(`[lgpd] ${blobsFailed.length} blob(s) do paciente ${patientId} não apagados do storage:`, blobsFailed);
+  }
+
   await audit(null, {
     organizationId: patient.organizationId,
     action: "patient.anonymize",
     entityType: "Patient",
     entityId: patientId,
-    after: { reason, appointments: appointmentIds.length },
+    after: { reason, appointments: appointmentIds.length, documents: documentKeys.length, blobsFailed: blobsFailed.length },
   });
 
   return { alreadyDone: false as const, appointments: appointmentIds.length };

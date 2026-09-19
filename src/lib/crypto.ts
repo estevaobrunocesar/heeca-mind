@@ -23,21 +23,29 @@ function getKey(): Buffer {
   return key;
 }
 
-export function encrypt(plaintext: string): string {
+/** Cifra bytes (arquivos do prontuário). Saída: iv + tag + ciphertext. */
+export function encryptBytes(plaintext: Buffer): Buffer {
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGO, getKey(), iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, ciphertext]).toString("base64");
+  return Buffer.concat([iv, tag, ciphertext]);
+}
+
+export function decryptBytes(payload: Buffer): Buffer {
+  if (payload.length < IV_LENGTH + TAG_LENGTH) throw new Error("Payload cifrado inválido");
+  const iv = payload.subarray(0, IV_LENGTH);
+  const tag = payload.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+  const ciphertext = payload.subarray(IV_LENGTH + TAG_LENGTH);
+  const decipher = createDecipheriv(ALGO, getKey(), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
+
+export function encrypt(plaintext: string): string {
+  return encryptBytes(Buffer.from(plaintext, "utf8")).toString("base64");
 }
 
 export function decrypt(payload: string): string {
-  const buf = Buffer.from(payload, "base64");
-  if (buf.length < IV_LENGTH + TAG_LENGTH) throw new Error("Payload cifrado inválido");
-  const iv = buf.subarray(0, IV_LENGTH);
-  const tag = buf.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
-  const ciphertext = buf.subarray(IV_LENGTH + TAG_LENGTH);
-  const decipher = createDecipheriv(ALGO, getKey(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+  return decryptBytes(Buffer.from(payload, "base64")).toString("utf8");
 }

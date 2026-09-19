@@ -186,3 +186,7 @@ export const policySchema = z.object({
   paymentInfo: optionalText(1000),
   terms: optionalText(3000),
 });
+
+export const retentionSchema = z.object({
+  retentionYears: z.coerce.number().int().min(5, "Mínimo legal de 5 anos (CFP)").max(20, "Máximo de 20 anos"),
+});

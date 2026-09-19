@@ -17,7 +17,8 @@
     "test": "tsx --test tests/**/*.test.ts",
     "cron": "tsx --conditions=react-server scripts/cron.ts",
     "webhook:sim": "tsx scripts/simulate-webhook.ts",
-    "check:rate-limit": "tsx --conditions=react-server scripts/rate-limit-check.ts"
+    "check:rate-limit": "tsx --conditions=react-server scripts/rate-limit-check.ts",
+    "check:lgpd": "tsx --conditions=react-server scripts/lgpd-check.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

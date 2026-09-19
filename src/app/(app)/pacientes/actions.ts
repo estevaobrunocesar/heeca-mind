@@ -10,6 +10,7 @@ import { canDeletePatient } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { assertPatientInTenant } from "@/lib/tenant";
 import { patientSchema } from "@/lib/validation/patient";
+import { anonymizePatient } from "@/lib/lgpd/anonymize";
 
 /** WhatsApp é único por organização — evita dois cadastros da mesma pessoa. */
 async function whatsappTaken(organizationId: string, whatsapp: string, exceptId?: string) {
@@ -63,9 +64,9 @@ export async function updatePatientAction(patientId: string, _prev: FormState, f
 
 /**
  * Exclusão lógica (LGPD). O cadastro sai das listas e da busca, mas o
- * histórico administrativo é preservado pelo prazo de retenção — a
- * anonimização definitiva é um job futuro. Bloqueada se houver sessões
- * futuras ativas: cancele-as antes.
+ * histórico administrativo é preservado pelo prazo de retenção; depois, o
+ * job em src/lib/lgpd/anonymize.ts anonimiza de forma irreversível.
+ * Bloqueada se houver sessões futuras ativas: cancele-as antes.
  */
 export async function deletePatientAction(patientId: string): Promise<{ error?: string }> {
   const actor = await requireActor();
@@ -88,12 +89,32 @@ export async function deletePatientAction(patientId: string): Promise<{ error?: 
 export async function restorePatientAction(patientId: string) {
   const actor = await requireActor();
   if (!canDeletePatient(actor)) throw new Error("Sem permissão");
-  const p = await db.patient.findFirst({ where: { id: patientId, organizationId: actor.organizationId }, select: { id: true } });
+  const p = await db.patient.findFirst({ where: { id: patientId, organizationId: actor.organizationId }, select: { id: true, anonymizedAt: true } });
   if (!p) throw new Error("Paciente não encontrado");
+  if (p.anonymizedAt) throw new Error("Cadastro anonimizado não pode ser restaurado");
 
   await db.patient.update({ where: { id: patientId }, data: { deletedAt: null, followUpStatus: "ACTIVE" } });
   await audit(actor, { organizationId: actor.organizationId, action: "patient.restore", entityType: "Patient", entityId: patientId });
 
   revalidatePath("/pacientes");
   revalidatePath(`/pacientes/${patientId}`);
+}
+
+/**
+ * Anonimização manual, antes do prazo — a pedido do titular (LGPD art. 18, VI).
+ * Irreversível. Exige que o cadastro já esteja excluído, como dupla confirmação.
+ */
+export async function anonymizePatientNowAction(patientId: string): Promise<{ error?: string }> {
+  const actor = await requireActor();
+  if (!canDeletePatient(actor)) return { error: "Sem permissão." };
+  const p = await db.patient.findFirst({ where: { id: patientId, organizationId: actor.organizationId }, select: { deletedAt: true, anonymizedAt: true } });
+  if (!p) return { error: "Paciente não encontrado." };
+  if (p.anonymizedAt) return { error: "Já anonimizado." };
+  if (!p.deletedAt) return { error: "Exclua o cadastro antes de anonimizar." };
+
+  await anonymizePatient(patientId, "manual");
+  await audit(actor, { organizationId: actor.organizationId, action: "patient.anonymize_manual", entityType: "Patient", entityId: patientId });
+  revalidatePath("/pacientes");
+  revalidatePath(`/pacientes/${patientId}`);
+  return {};
 }

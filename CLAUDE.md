@@ -117,3 +117,12 @@ prisma/                schema, migrations, seed
 - Toda chave leva o prefixo `hecca-psico/` — o bucket pode ser compartilhado entre os produtos Heeca.
 - Foto de perfil: recorte quadrado + resize 512px no navegador (canvas, sem `sharp`); servidor valida magic bytes (`src/lib/image.ts`) e 1,5 MB. SVG é recusado (pode carregar script). Chave com timestamp → cache imutável; a anterior é apagada em melhor esforço. `Professional.photoKey` guarda a chave para exclusão.
 - Server Actions aceitam até 3 MB (`next.config.ts`).
+
+## LGPD — retenção e anonimização
+
+- `Organization.retentionYears` (mín. 5, CFP 001/2009), editável só por OWNER na aba Políticas.
+- Regra pura em `src/lib/lgpd/retention.ts`: cadastro excluído é anonimizado quando `max(deletedAt, últimoAtendimento) + retentionYears <= agora`. Nunca anonimiza cadastro não excluído.
+- `anonymizePatient` (`src/lib/lgpd/anonymize.ts`) é irreversível: zera nome/contato/observações, textos das sessões, payloads de notificações, `before/after` da auditoria; apaga notas clínicas; mantém sessões, valores, status, datas. `whatsapp` vira `anon:<id>` (mantém a unicidade).
+- Job roda no `runCron`; `npm run check:lgpd` é o teste de integração. Eventos brutos do webhook são purgados após 90 dias.
+- Exportação do titular (art. 18): `GET /pacientes/[id]/export` (JSON), só `canDeletePatient`, auditada como `patient.export`.
+- "Anonimizar agora" na ficha exige o cadastro já excluído — dupla confirmação para uma ação sem volta.

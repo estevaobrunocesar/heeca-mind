@@ -15,8 +15,10 @@ import {
   exceptionSchema,
   policySchema,
   profileSchema,
+  retentionSchema,
   scheduleSettingsSchema,
 } from "@/lib/validation/professional";
+import { canManageMembers } from "@/lib/permissions";
 
 /** Contexto comum: ator, profissional dono das configurações e fuso da organização. */
 async function ctx() {
@@ -325,6 +327,23 @@ export async function updatePolicyAction(_prev: FormState, formData: FormData): 
     after,
   });
 
+  revalidatePath("/configuracoes/politicas");
+  return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────
+// Retenção de dados (LGPD) — nível da organização, só OWNER
+// ──────────────────────────────────────────────────────────────
+
+export async function updateRetentionAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireActor();
+  if (!canManageMembers(actor)) return { error: "Só o responsável pela organização altera a retenção." };
+  const parsed = retentionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return invalid(parsed.error, formData);
+
+  const before = await db.organization.findUniqueOrThrow({ where: { id: actor.organizationId }, select: { retentionYears: true } });
+  await db.organization.update({ where: { id: actor.organizationId }, data: { retentionYears: parsed.data.retentionYears } });
+  await audit(actor, { organizationId: actor.organizationId, action: "organization.retention", entityType: "Organization", entityId: actor.organizationId, before, after: parsed.data });
   revalidatePath("/configuracoes/politicas");
   return { ok: true };
 }

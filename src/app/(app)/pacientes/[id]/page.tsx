@@ -11,6 +11,8 @@ import { requireActor } from "@/lib/session";
 import { formatDateTimeBR } from "@/lib/time";
 import { FOLLOW_UP_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
 import { PatientDangerZone } from "./danger-zone";
+import { anonymizationDueAt } from "@/lib/lgpd/retention";
+import { formatDateBR } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Paciente" };
 
@@ -49,7 +51,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
   const p = await db.patient.findFirst({
     where: { id, organizationId: actor.organizationId },
     include: {
-      organization: { select: { timezone: true } },
+      organization: { select: { timezone: true, retentionYears: true } },
       appointments: {
         orderBy: { startsAt: "desc" },
         take: 100,
@@ -78,17 +80,24 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
   const upcoming = p.appointments.filter((a) => a.startsAt > now && ACTIVE_STATUSES.includes(a.status as (typeof ACTIVE_STATUSES)[number])).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const pendingPayment = p.appointments.filter((a) => a.status === "COMPLETED" && a.paymentStatus === "PENDING").reduce((s, a) => s + a.priceCents, 0);
   const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const lastAppointmentAt = p.appointments[0]?.startsAt ?? null; // lista ordenada desc
+  const due = anonymizationDueAt({ deletedAt: p.deletedAt, lastAppointmentAt, retentionYears: p.organization.retentionYears });
 
   return (
     <>
       <PageHeader
         title={p.name}
-        description={p.deletedAt ? `Excluído em ${formatDateTimeBR(p.deletedAt, tz)}` : `${FOLLOW_UP_LABEL[p.followUpStatus]}${p.firstAppointmentAt ? ` · paciente desde ${formatDateTimeBR(p.firstAppointmentAt, tz).slice(0, 10)}` : ""}`}
+        description={p.anonymizedAt ? `Anonimizado em ${formatDateTimeBR(p.anonymizedAt, tz)}` : p.deletedAt ? `Excluído em ${formatDateTimeBR(p.deletedAt, tz)}` : `${FOLLOW_UP_LABEL[p.followUpStatus]}${p.firstAppointmentAt ? ` · paciente desde ${formatDateTimeBR(p.firstAppointmentAt, tz).slice(0, 10)}` : ""}`}
         actions={
           <div className="flex gap-2">
             <Link href="/pacientes" className="btn-ghost">
               ← Pacientes
             </Link>
+            {canDeletePatient(actor) && !p.anonymizedAt && (
+              <a href={`/pacientes/${p.id}/export`} className="btn-ghost" title="Dados do titular (LGPD art. 18)">
+                Exportar dados
+              </a>
+            )}
             {!p.deletedAt && (
               <>
                 <Link href={`/pacientes/${p.id}/editar`} className="btn-ghost">
@@ -188,9 +197,9 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
               {p.email && <Row label="E-mail">{p.email}</Row>}
               {p.bestContactTime && <Row label="Melhor horário">{p.bestContactTime}</Row>}
             </dl>
-            <a href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn-ghost mt-3 w-full">
+            {!p.anonymizedAt && <a href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn-ghost mt-3 w-full">
               Abrir WhatsApp ↗
-            </a>
+            </a>}
           </section>
 
           <section className="card">
@@ -221,7 +230,9 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
             </p>
           </section>
 
-          {canDeletePatient(actor) && <PatientDangerZone id={p.id} deleted={!!p.deletedAt} />}
+          {canDeletePatient(actor) && (
+            <PatientDangerZone id={p.id} deleted={!!p.deletedAt} anonymized={!!p.anonymizedAt} anonymizationDue={due ? formatDateBR(due, tz) : null} />
+          )}
         </aside>
       </div>
     </>

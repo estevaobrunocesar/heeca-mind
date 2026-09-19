@@ -21,6 +21,9 @@ function at(daysFromNow: number, hour: number, minute = 0) {
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_SEED !== "1") {
+    throw new Error("Seed de desenvolvimento bloqueado em produção (ALLOW_SEED=1 para forçar).");
+  }
   const email = "ana@exemplo.com";
   if (await db.user.findUnique({ where: { email } })) {
     console.log("Seed já aplicado.");

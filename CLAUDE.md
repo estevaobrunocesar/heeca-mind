@@ -19,6 +19,8 @@ npm run dev
 npm run cron                  # roda dispatcher/expiração/webhook uma vez (dev)
 npm run webhook:sim -- message +5511999990000 "sim"   # simula resposta do paciente
 npm test
+npm run build                 # build de produção (NODE_ENV=production)
+npm run docker:build          # imagem Docker
 npm run typecheck
 ```
 
@@ -150,3 +152,11 @@ prisma/                schema, migrations, seed
 - Página pública da clínica: `/clinica/[slug]` (Organization.slug) lista profissionais ativos → `/agendar/[slug]`.
 - Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica`.
 - Migrações com aviso interativo (índice único): `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` para a pasta e `prisma migrate deploy`.
+
+## Deploy (ver docs/DEPLOY.md)
+
+- `src/lib/env.ts` valida o ambiente em `src/instrumentation.ts`; produção exige https, `CRON_SECRET`, chave de 32 bytes; s3 exige credenciais; WhatsApp exige as 4 variáveis juntas. Falha lista todos os problemas.
+- `/api/health` (sem auth) faz `SELECT 1`. Headers de segurança em `next.config.ts`.
+- Docker: `DOCKER_BUILD=1` ativa `output: standalone`; `docker/entrypoint.sh` roda `migrate deploy` no start; `docker-compose.prod.yml` traz db + app + cron (curl a cada minuto). Fora da Vercel, `AUTH_TRUST_HOST=true`.
+- Vercel: `vercel.json` (região gru1 + cron); use URL de banco com pooler; `STORAGE_DRIVER=s3`.
+- Seed bloqueado em produção (`ALLOW_SEED=1` força).

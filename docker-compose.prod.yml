@@ -1,0 +1,56 @@
+# Produção num VPS: app + Postgres + cron. Use com um proxy TLS na frente
+# (Caddy/Traefik/Nginx) apontando para app:3000.
+#
+#   cp .env.example .env   # preencha
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hecca
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: hecca_psico
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hecca -d hecca_psico"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://hecca:${POSTGRES_PASSWORD}@db:5432/hecca_psico?schema=public
+      AUTH_TRUST_HOST: "true"
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+    volumes:
+      - uploads:/app/public/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  # Dispara /api/cron a cada minuto (WhatsApp, expirações, LGPD, limpezas).
+  cron:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - app
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          curl -fsS -H "Authorization: Bearer $$CRON_SECRET" http://app:3000/api/cron >/dev/null || echo "cron falhou $$(date)"
+          sleep 60
+        done
+
+volumes:
+  pg_data:
+  uploads:

@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+public/uploads
+docs
+tests
+scripts
+*.md
+!README.md
+.claude

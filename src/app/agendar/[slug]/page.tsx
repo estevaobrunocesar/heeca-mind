@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 
@@ -90,17 +91,22 @@ export default async function PublicBookingPage({ params }: PageProps<"/agendar/
         ) : (
           <ul className="space-y-3">
             {p.services.map((s) => (
-              <li key={s.id} className="card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{s.name}</p>
-                    {s.description && <p className="mt-1 text-sm text-text-muted">{s.description}</p>}
-                    <p className="mt-2 text-xs text-text-muted">
-                      {s.durationMinutes} min · {MODALITY_LABEL[s.modality]}
-                    </p>
+              <li key={s.id}>
+                <Link href={`/agendar/${slug}/${s.id}`} className="card block p-4 transition hover:border-primary/50 hover:shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{s.name}</p>
+                      {s.description && <p className="mt-1 text-sm text-text-muted">{s.description}</p>}
+                      <p className="mt-2 text-xs text-text-muted">
+                        {s.durationMinutes} min · {MODALITY_LABEL[s.modality]}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {p.showPrices && <p className="text-sm font-medium">{formatBRL(s.priceCents)}</p>}
+                      <p className="mt-1 text-xs text-primary">Agendar →</p>
+                    </div>
                   </div>
-                  {p.showPrices && <p className="shrink-0 text-sm font-medium">{formatBRL(s.priceCents)}</p>}
-                </div>
+                </Link>
               </li>
             ))}
           </ul>

@@ -50,7 +50,7 @@ prisma/                schema, migrations, seed
 | 3 Serviços | ✅ CRUD, ordenação, ativar/desativar, exclusão protegida |
 | 4 Agenda | ✅ dia/semana/mês, criação manual + recorrência, transições de status, reagendar, cancelar série |
 | 5 Pacientes | ⬜ schema pronto |
-| 6 Agendamento público | 🟡 perfil renderiza; fluxo de escolha de horário pendente |
+| 6 Agendamento público | ✅ modalidade → mês → dia → horário → dados + LGPD; confirmação/cancelamento por token |
 | 7 WhatsApp | 🟡 provider + templates + webhook + enfileiramento (Notification QUEUED); dispatcher pendente |
 | 8 Dashboard | 🟡 contadores básicos |
 | 9 Financeiro | ⬜ schema pronto |
@@ -77,3 +77,12 @@ prisma/                schema, migrations, seed
 - Mutações de agenda enfileiram `Notification` (QUEUED) via `src/lib/notifications.ts`; o envio real é o dispatcher do módulo 7.
 - Cancelar "série" cancela só as sessões futuras ainda ativas e encerra a `RecurringSeries`; passadas ficam intactas.
 - Checkbox em zod: use `checkbox` de `src/lib/validation/common.ts` (chave ausente = false). Union com `z.undefined()` falha em zod 4.
+
+## Fluxo público
+
+- `/agendar/[slug]/[serviceId]` é 100% server-rendered; cada passo é um link com searchParams (`modality`, `month`, `date`, `time`). Sem estado no cliente até o formulário final.
+- `createPublicBookingAction` re-valida o slot no servidor dentro de uma transação com `pg_advisory_xact_lock(hashtext(professionalId))` — evita dupla reserva simultânea.
+- A página "solicitado" NÃO exibe o token; confirmar só pelo link do WhatsApp (`/confirmar/[token]`) comprova a posse do número.
+- Paciente é reaproveitado por (organizationId, whatsapp); nome existente não é sobrescrito por formulário anônimo.
+- Rotas públicas (`agendar`, `confirmar`, `sessao`) ficam fora do matcher do proxy — ver `src/proxy.ts`.
+- Pendente: rate limit no formulário público (há honeypot `website`, mas não há limite por IP) e expiração automática de `AWAITING_CONFIRMATION` antigas.

@@ -128,7 +128,8 @@ model Professional {
   fullName    String
   crp         String // dado profissional — exibido só onde o profissional autorizar
   showCrp     Boolean  @default(true)
-  photoUrl    String?
+  photoUrl    String? // URL pública (nossa ou externa)
+  photoKey    String? // chave no storage quando a foto foi enviada por nós — permite apagar
   bio         String?
   approaches  String[] // ex.: ["TCC", "Psicanálise"]
   specialties String[] // ex.: ["Ansiedade", "Adolescentes"]

@@ -110,3 +110,10 @@ prisma/                schema, migrations, seed
 - "Realizado" = concluídas do mês (por `startsAt`); "Recebido" = `Payment.paidAt` no mês (caixa, independe da data da sessão); "Previsto" = concluídas + confirmadas do mês, passadas ou não — mesma definição no dashboard.
 - Valores só para `canViewFinancials` (profissional dono ou OWNER); recepção não vê.
 - CSV em `/financeiro/export?month=YYYY-MM`: separador `;` e BOM para o Excel pt-BR.
+
+## Storage de arquivos
+
+- `src/lib/storage/`: interface `StorageProvider`, drivers `local` (public/uploads, dev e VPS) e `s3` (SigV4 manual, testado contra o vetor da AWS; funciona com S3/R2/MinIO). `STORAGE_DRIVER` escolhe.
+- Toda chave leva o prefixo `hecca-psico/` — o bucket pode ser compartilhado entre os produtos Heeca.
+- Foto de perfil: recorte quadrado + resize 512px no navegador (canvas, sem `sharp`); servidor valida magic bytes (`src/lib/image.ts`) e 1,5 MB. SVG é recusado (pode carregar script). Chave com timestamp → cache imutável; a anterior é apagada em melhor esforço. `Professional.photoKey` guarda a chave para exclusão.
+- Server Actions aceitam até 3 MB (`next.config.ts`).

@@ -10,7 +10,6 @@ export type ProfileValues = {
   fullName: string;
   crp: string;
   showCrp: boolean;
-  photoUrl: string | null;
   bio: string | null;
   approaches: string[];
   specialties: string[];
@@ -76,15 +75,6 @@ export function ProfileForm({ profile, publicBaseUrl }: { profile: ProfileValues
             <Checkbox label="Exibir CRP na página pública" name="showCrp" defaultChecked={checked("showCrp")} />
           </div>
         </div>
-        <Field
-          label="Foto profissional (URL)"
-          name="photoUrl"
-          required={false}
-          placeholder="https://…"
-          hint="Upload de imagem virá em breve; por ora, cole o endereço de uma foto já hospedada."
-          defaultValue={val("photoUrl")}
-          errors={fe?.photoUrl}
-        />
         <TextArea
           label="Descrição da atuação"
           name="bio"

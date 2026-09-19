@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { formValues, invalid, type FormState } from "@/lib/form";
 import { canEditProfessional } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
+import { IMAGE_EXT, IMAGE_MIME, MAX_PHOTO_BYTES, sniffImage } from "@/lib/image";
+import { getStorage } from "@/lib/storage";
 import { dateTimeInTz, formatDateTimeBR } from "@/lib/time";
 import {
   availabilitySchema,
@@ -62,6 +64,53 @@ export async function updateProfileAction(_prev: FormState, formData: FormData):
   revalidatePath(`/agendar/${before.slug}`);
   revalidatePath(`/agendar/${after.slug}`);
   return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────
+// Foto profissional
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Recebe a foto já recortada/redimensionada pelo cliente (canvas), valida
+ * pelo conteúdo e grava no storage. A chave inclui um timestamp: cada upload
+ * é uma URL nova, então cache agressivo é seguro e a antiga pode ser apagada.
+ */
+export async function uploadProfilePhotoAction(formData: FormData): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const { actor, professionalId } = await ctx();
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Selecione uma imagem." };
+  if (file.size > MAX_PHOTO_BYTES) return { ok: false, error: "Imagem muito grande (máx. 1,5 MB)." };
+
+  const buf = Buffer.from(await file.arrayBuffer());
+  const kind = sniffImage(buf);
+  if (!kind) return { ok: false, error: "Formato não suportado. Use JPG, PNG ou WebP." };
+
+  const before = await db.professional.findUniqueOrThrow({ where: { id: professionalId }, select: { photoKey: true, photoUrl: true } });
+  const storage = getStorage();
+  const { key, url } = await storage.put({
+    key: `professionals/${professionalId}/photo-${Date.now()}.${IMAGE_EXT[kind]}`,
+    body: buf,
+    contentType: IMAGE_MIME[kind],
+  });
+
+  await db.professional.update({ where: { id: professionalId }, data: { photoUrl: url, photoKey: key } });
+  if (before.photoKey && before.photoKey !== key) {
+    await storage.delete(before.photoKey).catch(() => {}); // melhor esforço: a nova já está salva
+  }
+
+  await audit(actor, { organizationId: actor.organizationId, action: "professional.photo", entityType: "Professional", entityId: professionalId, before: { photoUrl: before.photoUrl }, after: { photoUrl: url } });
+  revalidatePath("/configuracoes");
+  return { ok: true, url };
+}
+
+export async function removeProfilePhotoAction(): Promise<void> {
+  const { actor, professionalId } = await ctx();
+  const before = await db.professional.findUniqueOrThrow({ where: { id: professionalId }, select: { photoKey: true, photoUrl: true, slug: true } });
+  await db.professional.update({ where: { id: professionalId }, data: { photoUrl: null, photoKey: null } });
+  if (before.photoKey) await getStorage().delete(before.photoKey).catch(() => {});
+  await audit(actor, { organizationId: actor.organizationId, action: "professional.photo_remove", entityType: "Professional", entityId: professionalId, before: { photoUrl: before.photoUrl } });
+  revalidatePath("/configuracoes");
+  revalidatePath(`/agendar/${before.slug}`);
 }
 
 // ──────────────────────────────────────────────────────────────

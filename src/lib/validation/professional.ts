@@ -54,7 +54,6 @@ export const profileSchema = z.object({
     .refine((v) => v.length >= 6 && v.length <= 8, "CRP inválido")
     .transform((v) => `${v.slice(0, 2)}/${v.slice(2)}`),
   showCrp: checkbox,
-  photoUrl: optionalUrl,
   bio: optionalText(1200),
   approaches: tagList,
   specialties: tagList,

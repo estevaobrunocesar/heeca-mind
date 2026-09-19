@@ -12,6 +12,7 @@ export async function requireActor(): Promise<Actor> {
   const session = await auth();
   const u = session?.user;
   if (!u?.id || !u.organizationId) redirect("/login");
+  if (u.mfaPending) redirect("/login/mfa"); // defesa em profundidade além do proxy
   return {
     userId: u.id,
     organizationId: u.organizationId,
@@ -24,7 +25,7 @@ export async function requireActor(): Promise<Actor> {
 export async function getActor(): Promise<Actor | null> {
   const session = await auth();
   const u = session?.user;
-  if (!u?.id || !u.organizationId) return null;
+  if (!u?.id || !u.organizationId || u.mfaPending) return null;
   return {
     userId: u.id,
     organizationId: u.organizationId,

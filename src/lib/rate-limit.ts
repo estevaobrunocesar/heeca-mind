@@ -115,6 +115,8 @@ export const RULES = {
   /** Login: por IP e por e-mail, para não bloquear um escritório inteiro por um erro de senha. */
   loginIp: { scope: "login:ip", limit: 20, windowSeconds: 15 * 60 },
   loginEmail: { scope: "login:email", limit: 8, windowSeconds: 15 * 60 },
+  /** Segundo fator: 6 dígitos são fáceis de chutar; por usuário. */
+  mfaVerify: { scope: "mfa:user", limit: 10, windowSeconds: 15 * 60 },
   /** Recuperação de senha: evita spam de e-mail. */
   passwordResetIp: { scope: "reset:ip", limit: 5, windowSeconds: 60 * 60 },
 } satisfies Record<string, RateLimitRule>;

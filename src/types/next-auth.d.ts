@@ -5,6 +5,10 @@ type TenantContext = {
   organizationId: string;
   role: MembershipRole;
   professionalId: string | null;
+  /** id da sessão (por login) — âncora da verificação MFA no servidor. */
+  sid: string;
+  /** true entre a senha e o segundo fator. */
+  mfaPending: boolean;
 };
 
 declare module "next-auth" {

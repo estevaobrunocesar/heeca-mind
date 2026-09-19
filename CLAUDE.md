@@ -126,3 +126,11 @@ prisma/                schema, migrations, seed
 - Job roda no `runCron`; `npm run check:lgpd` é o teste de integração. Eventos brutos do webhook são purgados após 90 dias.
 - Exportação do titular (art. 18): `GET /pacientes/[id]/export` (JSON), só `canDeletePatient`, auditada como `patient.export`.
 - "Anonimizar agora" na ficha exige o cadastro já excluído — dupla confirmação para uma ação sem volta.
+
+## MFA (TOTP)
+
+- `src/lib/mfa/totp.ts` é puro (RFC 6238/4226, testado contra os vetores oficiais); `src/lib/mfa/service.ts` faz ativação em dois passos, verificação no login, códigos de recuperação (sha256, uso único), desativação.
+- Login em duas etapas: `authorize()` devolve `sid` (uuid por login) e `mfaPending = user.mfaEnabled`. O proxy redireciona rotas protegidas para `/login/mfa` enquanto pendente; `requireActor()` repete a checagem.
+- Liberação: a action de `/login/mfa` grava `MfaVerification(sid)` e chama `unstable_update({ user: { mfaPending: false } })`. O callback `jwt` (versão Node, em `src/auth.ts`) só zera `mfaPending` se a linha existir para aquele `sid` — um `update()` vindo do cliente sem código não muda nada (testado).
+- Segredo TOTP fica cifrado (`mfaSecretEnc`, AES-GCM). Operações sensíveis (desativar, regenerar códigos) exigem código atual. Rate limit `mfa:user` 10/15 min.
+- `qrcode` é a única dependência nova (QR do `otpauth://`).

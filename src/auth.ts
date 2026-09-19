@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
@@ -10,8 +11,29 @@ const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    /**
+     * Versão Node do callback: além do login, trata o `update()` disparado
+     * depois do segundo fator. Só libera `mfaPending` se existir a prova no
+     * banco para este `sid` — um update vindo do cliente sem essa linha não
+     * muda nada.
+     */
+    async jwt({ token, user, trigger, session }) {
+      token = authConfig.callbacks.jwt({ token, user }) as typeof token;
+      const wantsRelease = (session as { user?: { mfaPending?: boolean } } | undefined)?.user?.mfaPending === false;
+      if (trigger === "update" && wantsRelease && token.mfaPending && token.sid) {
+        const proof = await db.mfaVerification.findUnique({ where: { sid: token.sid } });
+        if (proof && proof.userId === token.userId) {
+          token.mfaPending = false;
+          await db.mfaVerification.delete({ where: { sid: token.sid } }).catch(() => {});
+        }
+      }
+      return token;
+    },
+  },
   providers: [
     Credentials({
       credentials: { email: {}, password: {} },
@@ -54,6 +76,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           organizationId: membership.organizationId,
           role: membership.role,
           professionalId: user.professional?.id ?? null,
+          sid: randomUUID(),
+          mfaPending: user.mfaEnabled,
         };
       },
     }),

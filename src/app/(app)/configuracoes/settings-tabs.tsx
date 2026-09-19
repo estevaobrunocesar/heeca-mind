@@ -8,6 +8,7 @@ const TABS = [
   { href: "/configuracoes/horarios", label: "Horários" },
   { href: "/configuracoes/bloqueios", label: "Bloqueios" },
   { href: "/configuracoes/politicas", label: "Políticas" },
+  { href: "/configuracoes/seguranca", label: "Segurança" },
 ] as const;
 
 export function SettingsTabs() {

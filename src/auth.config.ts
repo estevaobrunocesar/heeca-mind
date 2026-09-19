@@ -23,6 +23,7 @@ export const authConfig = {
         pathname.startsWith("/pacientes") ||
         pathname.startsWith("/servicos") ||
         pathname.startsWith("/configuracoes") ||
+        pathname.startsWith("/mensagens") ||
         pathname.startsWith("/financeiro");
 
       if (isProtected && !isLoggedIn) return false; // redireciona para pages.signIn

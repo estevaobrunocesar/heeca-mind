@@ -54,10 +54,9 @@ export async function enqueueAppointmentNotification(
     bodyVariables: buildVariables(type, values),
   };
   if (spec.urlButton) {
-    // Sufixo da URL dinâmica: token de confirmação ou id da sessão.
-    payload.buttonUrlSuffixes = [
-      { index: spec.urlButton.index, suffix: type === "BOOKING_REQUEST" ? (a.confirmationToken ?? a.id) : a.id },
-    ];
+    // Sufixo da URL dinâmica: sempre o token (não adivinhável), nunca o id.
+    if (!a.confirmationToken) throw new Error(`Agendamento ${a.id} sem token para botão de URL`);
+    payload.buttonUrlSuffixes = [{ index: spec.urlButton.index, suffix: a.confirmationToken }];
   }
 
   return db.notification.create({
@@ -93,9 +92,23 @@ export async function cancelQueuedNotifications(appointmentId: string) {
   });
 }
 
-/** Agenda o lembrete de 24h, se ainda houver tempo. */
+/**
+ * Agenda as mensagens automáticas de uma sessão confirmada:
+ *  - lembrete 24h antes;
+ *  - link da sala 2h antes, se online.
+ * Idempotente: não duplica se já houver uma QUEUED do mesmo tipo.
+ */
 export async function scheduleReminder(appointmentId: string, startsAt: Date) {
-  const remindAt = new Date(startsAt.getTime() - 24 * 60 * 60 * 1000);
-  if (remindAt <= new Date()) return;
-  await enqueueAppointmentNotification(appointmentId, "REMINDER_24H", { scheduledFor: remindAt });
+  const a = await db.appointment.findUniqueOrThrow({ where: { id: appointmentId }, select: { modality: true } });
+  const plan: Array<{ type: NotificationType; at: Date }> = [
+    { type: "REMINDER_24H", at: new Date(startsAt.getTime() - 24 * 60 * 60 * 1000) },
+  ];
+  if (a.modality === "ONLINE") plan.push({ type: "SESSION_LINK", at: new Date(startsAt.getTime() - 2 * 60 * 60 * 1000) });
+
+  for (const { type, at } of plan) {
+    if (at <= new Date()) continue;
+    const exists = await db.notification.findFirst({ where: { appointmentId, type, status: "QUEUED" }, select: { id: true } });
+    if (exists) continue;
+    await enqueueAppointmentNotification(appointmentId, type, { scheduledFor: at });
+  }
 }

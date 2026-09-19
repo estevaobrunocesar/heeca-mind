@@ -15,6 +15,7 @@ export type SettingsValues = {
   maxSessionsPerDay: number | null;
   lateToleranceMinutes: number;
   maxBookingDaysAhead: number;
+  confirmationTimeoutHours: number;
 };
 
 const STEP_OPTIONS = [
@@ -58,6 +59,10 @@ export function SettingsForm({ settings }: { settings: SettingsValues }) {
           <Field label="Máx. de sessões por dia" name="maxSessionsPerDay" type="number" inputMode="numeric" required={false} placeholder="sem limite" defaultValue={val("maxSessionsPerDay")} errors={fe?.maxSessionsPerDay} />
           <Field label="Tolerância de atraso (min)" name="lateToleranceMinutes" type="number" inputMode="numeric" defaultValue={val("lateToleranceMinutes")} errors={fe?.lateToleranceMinutes} />
           <Field label="Agenda aberta por (dias)" name="maxBookingDaysAhead" type="number" inputMode="numeric" defaultValue={val("maxBookingDaysAhead")} errors={fe?.maxBookingDaysAhead} hint="Até quantos dias à frente o paciente enxerga." />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Prazo p/ confirmar (horas)" name="confirmationTimeoutHours" type="number" inputMode="numeric" defaultValue={val("confirmationTimeoutHours")} errors={fe?.confirmationTimeoutHours} hint="Solicitação pública não confirmada expira e libera o horário." />
         </div>
 
         <div className="flex justify-end">

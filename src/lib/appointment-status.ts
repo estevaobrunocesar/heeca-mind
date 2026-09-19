@@ -61,6 +61,7 @@ export const STATUS_LABEL: Record<AppointmentStatus, string> = {
   COMPLETED: "Concluído",
   NO_SHOW: "Não compareceu",
   AWAITING_PAYMENT: "Aguardando pagamento",
+  EXPIRED: "Expirado (não confirmado)",
 };
 
 /** Classe de cor por status — usada nos chips da agenda. */
@@ -74,6 +75,7 @@ export const STATUS_TONE: Record<AppointmentStatus, "neutral" | "warning" | "suc
   COMPLETED: "neutral",
   NO_SHOW: "danger",
   AWAITING_PAYMENT: "warning",
+  EXPIRED: "muted",
 };
 
 export const TERMINAL_STATUSES: AppointmentStatus[] = [
@@ -81,4 +83,5 @@ export const TERMINAL_STATUSES: AppointmentStatus[] = [
   "CANCELLED_BY_PROFESSIONAL",
   "COMPLETED",
   "NO_SHOW",
+  "EXPIRED",
 ];

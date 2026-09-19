@@ -16,6 +16,9 @@ docker compose up -d          # Postgres local na porta 5433
 npm run db:migrate            # prisma migrate dev
 npm run db:seed               # ana@exemplo.com / senha12345 → /agendar/dra-ana-lucia
 npm run dev
+npm run cron                  # roda dispatcher/expiração/webhook uma vez (dev)
+npm run webhook:sim -- message +5511999990000 "sim"   # simula resposta do paciente
+npm test
 npm run typecheck
 ```
 
@@ -51,7 +54,7 @@ prisma/                schema, migrations, seed
 | 4 Agenda | ✅ dia/semana/mês, criação manual + recorrência, transições de status, reagendar, cancelar série |
 | 5 Pacientes | ⬜ schema pronto |
 | 6 Agendamento público | ✅ modalidade → mês → dia → horário → dados + LGPD; confirmação/cancelamento por token |
-| 7 WhatsApp | 🟡 provider + templates + webhook + enfileiramento (Notification QUEUED); dispatcher pendente |
+| 7 WhatsApp | ✅ dispatcher com retry, webhook (status + respostas), expiração de pendentes, link de sessão, painel /mensagens — falta só credenciais reais da Meta |
 | 8 Dashboard | 🟡 contadores básicos |
 | 9 Financeiro | ⬜ schema pronto |
 
@@ -85,4 +88,12 @@ prisma/                schema, migrations, seed
 - A página "solicitado" NÃO exibe o token; confirmar só pelo link do WhatsApp (`/confirmar/[token]`) comprova a posse do número.
 - Paciente é reaproveitado por (organizationId, whatsapp); nome existente não é sobrescrito por formulário anônimo.
 - Rotas públicas (`agendar`, `confirmar`, `sessao`) ficam fora do matcher do proxy — ver `src/proxy.ts`.
-- Pendente: rate limit no formulário público (há honeypot `website`, mas não há limite por IP) e expiração automática de `AWAITING_CONFIRMATION` antigas.
+- Pendente: rate limit no formulário público (há honeypot `website`, mas não há limite por IP).
+
+## WhatsApp (ver docs/WHATSAPP.md)
+
+- `src/lib/whatsapp/dispatcher.ts`: `runCron()` = processa webhook → expira pendentes → envia fila. Chamado por `/api/cron` (Bearer `CRON_SECRET`) a cada minuto ou `npm run cron`.
+- Claim atômico `QUEUED → SENDING` antes de enviar; retry com backoff só para erros retryable; máx. 5 tentativas.
+- Respostas do paciente: `src/lib/whatsapp/replies.ts` (puro, testado). "não" fora do prazo vira `RESCHEDULE_REQUESTED`, não cancela.
+- Botões de URL nos templates usam sempre `confirmationToken` como sufixo (`/confirmar/<token>`, `/sessao/<token>`).
+- Sem credenciais da Meta, `ConsoleWhatsAppProvider` loga e marca como SENT — não confundir com entrega real.

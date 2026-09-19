@@ -213,6 +213,7 @@ model ScheduleSettings {
   maxSessionsPerDay      Int? // null = sem limite
   lateToleranceMinutes   Int  @default(15)
   maxBookingDaysAhead    Int  @default(60) // janela máxima visível na página pública
+  confirmationTimeoutHours Int @default(24) // solicitação pública expira se não confirmada
 
   updatedAt DateTime @updatedAt
 
@@ -358,6 +359,7 @@ enum AppointmentStatus {
   COMPLETED
   NO_SHOW
   AWAITING_PAYMENT
+  EXPIRED // solicitação pública não confirmada no prazo
 }
 
 enum AppointmentModality {
@@ -516,6 +518,7 @@ enum NotificationType {
 
 enum NotificationStatus {
   QUEUED
+  SENDING // reservada por uma instância do dispatcher
   SENT
   DELIVERED
   READ

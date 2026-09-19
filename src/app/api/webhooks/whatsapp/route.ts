@@ -1,6 +1,7 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { processWebhookEvents } from "@/lib/whatsapp/dispatcher";
+import { extractWebhookEvents, verifyMetaSignature } from "@/lib/whatsapp/signature";
 
 /**
  * Webhook da Meta Cloud API.
@@ -26,33 +27,13 @@ export async function GET(req: Request) {
   return new Response("Forbidden", { status: 403 });
 }
 
-function verifySignature(rawBody: string, header: string | null): boolean {
-  const secret = process.env.WHATSAPP_APP_SECRET;
-  if (!secret || !header?.startsWith("sha256=")) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const received = header.slice("sha256=".length);
-  if (expected.length !== received.length) return false;
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(received));
-}
-
-type MetaWebhookBody = {
-  entry?: Array<{
-    changes?: Array<{
-      value?: {
-        statuses?: Array<{ id: string; status: string; timestamp: string }>;
-        messages?: Array<{ id: string; from: string; type: string }>;
-      };
-    }>;
-  }>;
-};
-
 export async function POST(req: Request) {
   const rawBody = await req.text();
-  if (!verifySignature(rawBody, req.headers.get("x-hub-signature-256"))) {
+  if (!verifyMetaSignature(rawBody, req.headers.get("x-hub-signature-256"), process.env.WHATSAPP_APP_SECRET)) {
     return new Response("Invalid signature", { status: 401 });
   }
 
-  let body: MetaWebhookBody;
+  let body: unknown;
   try {
     body = JSON.parse(rawBody);
   } catch {
@@ -61,17 +42,7 @@ export async function POST(req: Request) {
 
   // Um payload pode conter vários eventos; cada um vira uma linha com id
   // único para deduplicação (a Meta reenvia em caso de dúvida).
-  const events: Array<{ eventId: string; payload: unknown }> = [];
-  for (const entry of body.entry ?? []) {
-    for (const change of entry.changes ?? []) {
-      for (const s of change.value?.statuses ?? []) {
-        events.push({ eventId: `status:${s.id}:${s.status}`, payload: s });
-      }
-      for (const m of change.value?.messages ?? []) {
-        events.push({ eventId: `message:${m.id}`, payload: m });
-      }
-    }
-  }
+  const events = extractWebhookEvents(body);
 
   if (events.length > 0) {
     await db.whatsAppWebhookEvent.createMany({
@@ -80,7 +51,13 @@ export async function POST(req: Request) {
     });
   }
 
-  // TODO(módulo 7): enfileirar processWebhookEvent para atualizar
-  // Notification.status e tratar respostas do paciente.
+  // Processa já (operações rápidas de banco). O cron reprocessa o que sobrar.
+  if (events.length > 0) {
+    try {
+      await processWebhookEvents();
+    } catch (err) {
+      console.error("[whatsapp webhook] processamento falhou; o cron tentará de novo", err);
+    }
+  }
   return NextResponse.json({ received: events.length });
 }

@@ -3,6 +3,19 @@ import { headers } from "next/headers";
 import { db } from "./db";
 import type { Actor } from "./permissions";
 
+/**
+ * IP da requisição atual, ou null fora de uma (cron, scripts, webhook
+ * processado em background). headers() lança nesses contextos.
+ */
+async function requestIp(): Promise<string | null> {
+  try {
+    const h = await headers();
+    return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 type JsonValue = Parameters<typeof db.auditLog.create>[0]["data"]["before"];
 
 /**
@@ -22,8 +35,7 @@ export async function audit(
     after?: unknown;
   },
 ) {
-  const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const ip = await requestIp();
 
   await db.auditLog.create({
     data: {

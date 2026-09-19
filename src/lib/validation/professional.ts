@@ -113,6 +113,7 @@ export const scheduleSettingsSchema = z
       .refine((v) => v === null || (Number.isInteger(v) && v >= 1 && v <= 30), "Entre 1 e 30, ou vazio"),
     lateToleranceMinutes: z.coerce.number().int().min(0).max(60),
     maxBookingDaysAhead: z.coerce.number().int().min(1).max(365),
+    confirmationTimeoutHours: z.coerce.number().int().min(1).max(24 * 7),
   });
 
 const availabilityRule = z

@@ -69,30 +69,24 @@ export function canManageMembers(actor: Actor): boolean {
  * Pode ler/escrever as anotações clínicas de um paciente atendido por
  * `treatingProfessionalId`?
  *
- * Esta é a regra mais sensível do sistema. Ela define quem, dentro de uma
- * clínica, enxerga conteúdo terapêutico. Considere:
+ * REGRA ADOTADA (2026-09-19): só o profissional responsável — o usuário
+ * precisa ter perfil profissional e ele precisa ser exatamente o que atende.
  *
- *  - Sigilo profissional (Código de Ética do Psicólogo, art. 9): o conteúdo
- *    clínico pertence à relação psicólogo–paciente, não à clínica.
- *  - O OWNER de uma clínica pode ser um administrador que NÃO é psicólogo.
- *    Ele deve ver anotações clínicas? E se ele também for psicólogo, mas de
- *    outro paciente?
- *  - RECEPTIONIST nunca deve ter acesso — isso é consenso.
- *  - Supervisão clínica / substituição de profissional (férias, desligamento)
- *    são casos reais, mas provavelmente exigem um mecanismo explícito de
- *    delegação, não uma regra implícita por papel.
+ * Por quê:
+ *  - Código de Ética do Psicólogo (CFP), art. 9: o sigilo protege a relação
+ *    psicólogo–paciente. A clínica é a instituição; não é parte da relação.
+ *  - O OWNER de uma clínica pode ser um administrador sem CRP. Mesmo sendo
+ *    psicólogo, ele só vê os SEUS pacientes.
+ *  - RECEPTIONIST nunca.
+ *  - Supervisão, substituição em férias e transferência de paciente são
+ *    casos reais, mas exigem um ato explícito e auditado (delegação com
+ *    prazo), não uma exceção implícita por papel. Ficam para um módulo de
+ *    delegação; até lá, a transferência é feita pelo próprio profissional
+ *    via impressão/exportação.
  *
- * Toda leitura permitida por esta função gera um ClinicalAccessLog.
- *
- * TODO(você): implemente a regra. A assinatura já está pronta.
+ * Toda leitura permitida gera um ClinicalAccessLog (src/lib/clinical.ts).
  */
 export function canAccessClinicalData(actor: Actor, treatingProfessionalId: string): boolean {
-  // Implemente aqui. Sugestão de ponto de partida (mais restritivo possível):
-  //   return actor.professionalId !== null && actor.professionalId === treatingProfessionalId;
-  //
-  // Decida se OWNER-psicólogo tem alguma exceção, e documente o porquê num
-  // comentário — essa decisão será citada na política de privacidade.
-  void actor;
-  void treatingProfessionalId;
-  throw new Error("canAccessClinicalData: regra ainda não definida");
+  if (actor.role === "RECEPTIONIST") return false;
+  return actor.professionalId !== null && actor.professionalId === treatingProfessionalId;
 }

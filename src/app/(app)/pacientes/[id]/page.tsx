@@ -7,6 +7,7 @@ import { ACTIVE_STATUSES } from "@/lib/availability-data";
 import { db } from "@/lib/db";
 import { formatBRL } from "@/lib/money";
 import { canDeletePatient, canViewAnyFinancials } from "@/lib/permissions";
+import { canOpenClinicalRecord } from "@/lib/clinical";
 import { requireActor } from "@/lib/session";
 import { formatDateTimeBR } from "@/lib/time";
 import { FOLLOW_UP_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
@@ -81,6 +82,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
   const pendingPayment = p.appointments.filter((a) => a.status === "COMPLETED" && a.paymentStatus === "PENDING").reduce((s, a) => s + a.priceCents, 0);
   const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const showMoney = canViewAnyFinancials(actor);
+  const canOpenRecord = !p.anonymizedAt && (await canOpenClinicalRecord(actor, p.id));
   const lastAppointmentAt = p.appointments[0]?.startsAt ?? null; // lista ordenada desc
   const due = anonymizationDueAt({ deletedAt: p.deletedAt, lastAppointmentAt, retentionYears: p.organization.retentionYears });
 
@@ -226,11 +228,18 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
             )}
           </section>
 
-          <section className="card border-dashed">
+          <section className="card">
             <h2 className="mb-1 text-base font-semibold">Prontuário</h2>
-            <p className="text-sm text-text-muted">
-              Anotações clínicas ficam em módulo separado, cifradas e com acesso restrito ao profissional responsável. Em breve.
-            </p>
+            {canOpenRecord ? (
+              <>
+                <p className="text-sm text-text-muted">Evoluções, anotações e avaliações — cifradas, visíveis só para você.</p>
+                <Link href={`/pacientes/${p.id}/prontuario`} className="btn-primary mt-3 w-full">
+                  Abrir prontuário
+                </Link>
+              </>
+            ) : (
+              <p className="text-sm text-text-muted">Acesso restrito ao profissional responsável (sigilo, CFP art. 9).</p>
+            )}
           </section>
 
           {canDeletePatient(actor) && (

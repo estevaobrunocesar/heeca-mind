@@ -160,3 +160,11 @@ prisma/                schema, migrations, seed
 - Docker: `DOCKER_BUILD=1` ativa `output: standalone`; `docker/entrypoint.sh` roda `migrate deploy` no start; `docker-compose.prod.yml` traz db + app + cron (curl a cada minuto). Fora da Vercel, `AUTH_TRUST_HOST=true`.
 - Vercel: `vercel.json` (região gru1 + cron); use URL de banco com pooler; `STORAGE_DRIVER=s3`.
 - Seed bloqueado em produção (`ALLOW_SEED=1` força).
+
+## Prontuário (dados clínicos)
+
+- Regra de acesso decidida em 2026-09-19: `canAccessClinicalData` (pura) = ator é PROFESSIONAL/OWNER **com perfil** e é exatamente o profissional; + `isTreatingProfessional` (banco) = tem/teve sessão com o paciente. Dono sem perfil, dono-psicólogo de outro paciente e recepção: nunca. O seletor de profissional (`activeProfessionalId`) NÃO transfere acesso clínico. Supervisão/substituição virão por delegação explícita e auditada.
+- `src/lib/clinical.ts` é o único lugar que cifra/decifra (`crypto.ts`) e registra `ClinicalAccessLog` (READ/WRITE/DELETE/EXPORT). Actions do prontuário não chamam `audit()` — conteúdo clínico nunca entra em `audit_logs`, notificações ou e-mails.
+- Notas são imutáveis; exclusão é lógica com motivo e mantém o conteúdo cifrado até a anonimização LGPD (dever de guarda, CFP 001/2009).
+- Tipos: EVOLUTION (vinculada a sessão; uma por sessão), NOTE, ASSESSMENT. `/pacientes/[id]/prontuario/imprimir` gera a versão para PDF e registra EXPORT.
+- Verificação de leitura: `pg_dump | grep <palavra da nota>` deve dar 0.

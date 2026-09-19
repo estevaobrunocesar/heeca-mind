@@ -634,8 +634,15 @@ model WhatsAppWebhookEvent {
 // DADOS CLÍNICOS (módulo separado, cifrado, acesso restrito)
 // ───────────────────────────────────────────────────────────────
 
+enum ClinicalNoteKind {
+  EVOLUTION // evolução de uma sessão (vinculada a Appointment)
+  NOTE // anotação livre
+  ASSESSMENT // avaliação / relatório
+}
+
 /// Anotação clínica. `contentEnc` é cifrado com AES-256-GCM em src/lib/crypto.ts.
 /// Acesso controlado por src/lib/permissions.ts (canAccessClinicalData).
+/// Imutável após criada; exclusão é lógica com motivo (dever de guarda).
 model ClinicalNote {
   id             String  @id @default(cuid())
   patientId      String
@@ -643,10 +650,12 @@ model ClinicalNote {
   authorUserId   String // quem escreveu
   appointmentId  String?
 
+  kind       ClinicalNoteKind @default(NOTE)
   contentEnc String // base64: iv + tag + ciphertext
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
+  deletedReason String?
 
   patient      Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
   professional Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)

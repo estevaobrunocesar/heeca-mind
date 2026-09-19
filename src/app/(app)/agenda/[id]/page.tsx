@@ -9,7 +9,7 @@ import { requireActor } from "@/lib/session";
 import { formatDateTimeBR, slotLabelInTz, toLocalFields } from "@/lib/time";
 import { AdminNoteForm, OnlineLinkForm, StatusActions } from "./appointment-actions";
 import { PaymentSection } from "./payment-section";
-import { canViewFinancials } from "@/lib/permissions";
+import { canAccessClinicalData, canViewFinancials } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Sessão" };
 
@@ -43,6 +43,7 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
       patient: { select: { id: true, name: true, whatsapp: true, email: true, preferredPaymentMethod: true, needsReceipt: true } },
       professional: { select: { displayName: true, onlineFixedLink: true, organization: { select: { timezone: true } } } },
       series: { select: { id: true, frequency: true, isActive: true } },
+      clinicalNotes: { where: { kind: "EVOLUTION", deletedAt: null }, select: { id: true } },
       payments: { orderBy: { paidAt: "desc" } },
     },
   });
@@ -125,6 +126,20 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
           <section className="card">
             <AdminNoteForm id={a.id} note={a.adminNote} />
           </section>
+
+          {canAccessClinicalData(actor, a.professionalId) && !a.status.startsWith("CANCELLED") && a.status !== "EXPIRED" && (
+            <section className="card flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Evolução clínica</h2>
+                <p className="text-sm text-text-muted">
+                  {a.clinicalNotes.length > 0 ? "Registrada no prontuário." : "Ainda não registrada para esta sessão."}
+                </p>
+              </div>
+              <Link href={`/pacientes/${a.patient.id}/prontuario${a.clinicalNotes.length > 0 ? "" : `?sessao=${a.id}`}`} className={a.clinicalNotes.length > 0 ? "btn-ghost" : "btn-primary"}>
+                {a.clinicalNotes.length > 0 ? "Ver prontuário" : "Registrar evolução"}
+              </Link>
+            </section>
+          )}
         </div>
 
         <aside className="space-y-6">

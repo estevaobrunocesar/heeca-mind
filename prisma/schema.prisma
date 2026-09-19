@@ -45,6 +45,7 @@ model Organization {
   auditLogs           AuditLog[]
   invitations         Invitation[]
   clinicalDelegations ClinicalDelegation[]
+  waitlistEntries     WaitlistEntry[]
 
   @@map("organizations")
 }
@@ -236,6 +237,7 @@ model Professional {
   clinicalDocuments           ClinicalDocument[]
   clinicalDelegationsGranted  ClinicalDelegation[] @relation("DelegationsGranted")
   clinicalDelegationsReceived ClinicalDelegation[] @relation("DelegationsReceived")
+  waitlistEntries             WaitlistEntry[]
 
   @@index([organizationId])
   @@map("professionals")
@@ -257,6 +259,7 @@ model Service {
 
   professional    Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
   recurringSeries RecurringSeries[]
 
   @@index([professionalId, isActive])
@@ -407,6 +410,7 @@ model Patient {
   clinicalNotes       ClinicalNote[]
   clinicalDocuments   ClinicalDocument[]
   clinicalDelegations ClinicalDelegation[]
+  waitlistEntries     WaitlistEntry[]
   notifications       Notification[]
   receipts            Receipt[]
 
@@ -441,6 +445,7 @@ enum AppointmentSource {
   PUBLIC_PAGE
   MANUAL
   RECURRING
+  WAITLIST // horário oferecido a alguém da lista de espera
 }
 
 enum PaymentStatus {
@@ -529,6 +534,7 @@ model Appointment {
   receipt           Receipt?
   clinicalNotes     ClinicalNote[]
   clinicalDocuments ClinicalDocument[]
+  waitlistOffer     WaitlistEntry? // se este agendamento foi oferecido a partir da lista de espera
 
   @@index([professionalId, startsAt])
   @@index([organizationId, startsAt])
@@ -585,6 +591,8 @@ enum NotificationType {
   SESSION_LINK
   CANCELLATION
   RESCHEDULE
+  WAITLIST_JOINED // entrou na lista de espera
+  WAITLIST_OFFER // surgiu um horário; confirmar pelo link
 }
 
 enum NotificationStatus {
@@ -840,4 +848,58 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+// ───────────────────────────────────────────────────────────────
+// Lista de espera
+// ───────────────────────────────────────────────────────────────
+
+enum WaitlistStatus {
+  WAITING
+  OFFERED // um horário foi oferecido (agendamento AWAITING_CONFIRMATION vinculado)
+  BOOKED // o paciente confirmou o horário oferecido
+  REMOVED
+}
+
+enum DayPeriod {
+  MORNING
+  AFTERNOON
+  EVENING
+}
+
+/// Quem quer um horário que não existe (ainda). Preferências frouxas; a
+/// oferta é sempre um ato do profissional (ou recepção) — nunca automática.
+/// Regras puras em src/lib/waitlist-match.ts.
+model WaitlistEntry {
+  id             String  @id @default(cuid())
+  organizationId String
+  professionalId String
+  patientId      String
+  serviceId      String?
+
+  modality Modality? // null = qualquer (IN_PERSON | ONLINE)
+  weekdays Int[] // 0..6; vazio = qualquer
+  periods  DayPeriod[] // vazio = qualquer
+  note     String? // administrativo (ex.: "prefere depois das 17h")
+  source   AppointmentSource @default(MANUAL) // PUBLIC_PAGE | MANUAL
+  priority Boolean           @default(false)
+
+  status               WaitlistStatus @default(WAITING)
+  offersCount          Int            @default(0)
+  offeredAppointmentId String?        @unique
+  offeredAt            DateTime?
+  removedReason        String?
+  resolvedAt           DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional       Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient            Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  service            Service?     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  offeredAppointment Appointment? @relation(fields: [offeredAppointmentId], references: [id], onDelete: SetNull)
+
+  @@index([professionalId, status, createdAt])
+  @@index([patientId, status])
+  @@map("waitlist_entries")
 }

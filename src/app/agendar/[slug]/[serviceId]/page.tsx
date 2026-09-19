@@ -104,6 +104,7 @@ export default async function ServiceBookingPage({ params, searchParams }: PageP
   const gridStart = addDaysCivil(monthStart, -((weekdayOfCivilDate(monthStart) + 6) % 7));
   const cells = Array.from({ length: 42 }, (_, i) => addDaysCivil(gridStart, i));
   const [y, m] = month.split("-").map(Number);
+  const waitlistHref = `/agendar/${slug}/espera?serviceId=${service.id}`;
 
   return (
     <main className="mx-auto w-full max-w-lg px-4 py-6">
@@ -190,7 +191,12 @@ export default async function ServiceBookingPage({ params, searchParams }: PageP
               })}
             </div>
             {availableDays.size === 0 && (
-              <p className="mt-3 text-center text-xs text-text-muted">Nenhum horário disponível neste mês.</p>
+              <p className="mt-3 text-center text-xs text-text-muted">
+                Nenhum horário disponível neste mês.{" "}
+                <Link href={waitlistHref} className="font-medium text-primary hover:underline">
+                  Entrar na lista de espera
+                </Link>
+              </p>
             )}
           </div>
         </section>
@@ -201,7 +207,13 @@ export default async function ServiceBookingPage({ params, searchParams }: PageP
         <section className="mt-6">
           <Step n={service.modality === "HYBRID" ? 3 : 2} title="Escolha o horário" done={selectedTime ?? undefined} />
           {slotLabels.length === 0 ? (
-            <p className="text-sm text-text-muted">Sem horários neste dia. Escolha outra data.</p>
+            <p className="text-sm text-text-muted">
+              Sem horários neste dia. Escolha outra data ou{" "}
+              <Link href={waitlistHref} className="font-medium text-primary hover:underline">
+                entre na lista de espera
+              </Link>
+              .
+            </p>
           ) : (
             <div className="grid grid-cols-4 gap-2">
               {slotLabels.map((t) => (
@@ -217,6 +229,16 @@ export default async function ServiceBookingPage({ params, searchParams }: PageP
           )}
           <p className="mt-2 text-xs text-text-muted">Horários no fuso {tz.replace("_", " ")}.</p>
         </section>
+      )}
+
+      {!(modality && dateParam && selectedTime) && (
+        <p className="mt-8 text-center text-xs text-text-muted">
+          Nenhum horário serve?{" "}
+          <Link href={waitlistHref} className="text-primary hover:underline">
+            Entre na lista de espera
+          </Link>
+          .
+        </p>
       )}
 
       {/* Passo 4 — dados */}

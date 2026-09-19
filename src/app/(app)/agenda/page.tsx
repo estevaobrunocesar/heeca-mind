@@ -6,6 +6,7 @@ import { addDaysCivil, todayCivil, weekdayOfCivilDate } from "@/lib/availability
 import { db } from "@/lib/db";
 import { requireActor } from "@/lib/session";
 import { dateTimeInTz } from "@/lib/time";
+import { countWaiting } from "@/lib/waitlist";
 import { DayView, MonthView, WeekView } from "./calendar-views";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -106,6 +107,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       : Promise.resolve([]),
   ]);
 
+  const waiting = await countWaiting(actor.activeProfessionalId, actor.organizationId);
   const viewLink = (v: View, d = date) => `/agenda?view=${v}&date=${d}`;
   const tab = (v: View, label: string) => (
     <Link
@@ -121,9 +123,14 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       <PageHeader
         title="Agenda"
         actions={
-          <Link href={`/agenda/novo?date=${date}`} className="btn-primary">
-            Nova sessão
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/agenda/espera" className="btn-ghost">
+              Lista de espera{waiting > 0 && <span className="ml-1.5 rounded-full bg-primary-soft px-1.5 text-xs font-semibold text-primary">{waiting}</span>}
+            </Link>
+            <Link href={`/agenda/novo?date=${date}`} className="btn-primary">
+              Nova sessão
+            </Link>
+          </div>
         }
       />
 

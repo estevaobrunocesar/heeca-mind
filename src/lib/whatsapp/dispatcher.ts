@@ -2,6 +2,7 @@ import "server-only";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleReminder } from "@/lib/notifications";
+import { syncWaitlistForAppointment, syncWaitlistOffers } from "@/lib/waitlist";
 import { getWhatsAppProvider } from "./meta";
 import type { WhatsAppProvider } from "./provider";
 import { parseReply, replyTextFrom } from "./replies";
@@ -99,7 +100,7 @@ export async function dispatchQueued(provider: WhatsAppProvider = getWhatsAppPro
  */
 export async function expirePendingBookings() {
   const candidates = await db.appointment.findMany({
-    where: { status: "AWAITING_CONFIRMATION", source: "PUBLIC_PAGE" },
+    where: { status: "AWAITING_CONFIRMATION", source: { in: ["PUBLIC_PAGE", "WAITLIST"] } },
     select: {
       id: true,
       organizationId: true,
@@ -123,6 +124,7 @@ export async function expirePendingBookings() {
     if (r.count === 0) continue;
     await cancelQueuedNotifications(a.id);
     await audit(null, { organizationId: a.organizationId, action: "appointment.expire", entityType: "Appointment", entityId: a.id });
+    await syncWaitlistForAppointment(a.id);
     expired++;
   }
   return { expired };
@@ -227,6 +229,7 @@ async function applyReply(m: MessageEvent): Promise<boolean> {
     await audit(null, { organizationId: target.organizationId, action: "appointment.confirm", entityType: "Appointment", entityId: target.id, after: { by: "whatsapp_reply", text } });
     await enqueueAppointmentNotification(target.id, "BOOKING_CONFIRMED");
     await scheduleReminder(target.id, target.startsAt);
+    await syncWaitlistForAppointment(target.id);
     return true;
   }
 
@@ -245,6 +248,7 @@ async function applyReply(m: MessageEvent): Promise<boolean> {
   await audit(null, { organizationId: target.organizationId, action: "appointment.cancel_by_patient", entityType: "Appointment", entityId: target.id, after: { by: "whatsapp_reply", text } });
   await cancelQueuedNotifications(target.id);
   await enqueueAppointmentNotification(target.id, "CANCELLATION");
+  await syncWaitlistForAppointment(target.id);
   return true;
 }
 
@@ -252,11 +256,12 @@ async function applyReply(m: MessageEvent): Promise<boolean> {
 export async function runCron() {
   const webhook = await processWebhookEvents();
   const expiry = await expirePendingBookings();
+  const waitlistSynced = await syncWaitlistOffers();
   const dispatch = await dispatchQueued();
   const purgedRateLimits = await purgeRateLimits();
   const lgpd = await anonymizeExpiredPatients();
   const purgedWebhookEvents = await purgeOldWebhookEvents();
   const purgedMfa = await purgeStaleMfaVerifications();
   const purgedSessions = await purgeSessions();
-  return { webhook, expiry, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, purgedMfa, purgedSessions, at: new Date().toISOString() };
+  return { webhook, expiry, waitlistSynced, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, purgedMfa, purgedSessions, at: new Date().toISOString() };
 }

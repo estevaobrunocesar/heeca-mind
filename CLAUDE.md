@@ -188,3 +188,11 @@ prisma/                schema, migrations, seed
 - Todo acesso por delegação grava `delegationId` no `ClinicalAccessLog`; o painel "Acessos recentes" do titular mostra "· supervisão/substituição". Conceder/revogar são auditados em `audit_logs` (`clinical_delegation.grant|revoke`) — metadados, nunca conteúdo.
 - Revogação vale na requisição seguinte (escopos são resolvidos a cada acesso, sem cache). Gestão em `/configuracoes/delegacoes`; o prontuário mostra "Compartilhado com" para o titular e um aviso para o delegado.
 - Detalhe da sessão usa `canWriteFor(actor, patientId, professionalId)` para o botão "Registrar evolução" — próprio ou substituição.
+
+## Lista de espera
+
+- `WaitlistEntry`: uma ativa por (paciente, profissional); preferências frouxas (modalidade, dias, períodos), serviço opcional, prioridade, origem PUBLIC_PAGE/MANUAL. Regras puras em `src/lib/waitlist-match.ts` (`matchesSlot`, `sortWaitlist` = prioridade → ordem de chegada). Servidor em `src/lib/waitlist.ts`.
+- **A oferta é um `Appointment` AWAITING_CONFIRMATION com `source: WAITLIST`** — reserva o horário, ganha token, expira pelo `expirePendingBookings` e é confirmada/recusada em `/confirmar/[token]` ou por resposta no WhatsApp. Nada é oferecido automaticamente: sempre um clique do profissional/recepção (`offerSlot`), respeitando conflitos duros, não a grade.
+- `syncWaitlistForAppointment` reflete o destino do agendamento na entrada (CONFIRMED → BOOKED; cancelado/expirado → volta a WAITING, `offersCount`++). Chamado no `transition()` da agenda, em `/confirmar`, nas respostas do WhatsApp e na expiração; `syncWaitlistOffers` no cron é a rede de segurança.
+- Entrada pública: `/agendar/[slug]/espera` (links nos "sem horário" do fluxo), mesmo rate limit e honeypot do agendamento; repetir só atualiza preferências. Confirmação por template `WAITLIST_JOINED`; oferta por `WAITLIST_OFFER` (botão para `/confirmar/<token>`).
+- Painel `/agenda/espera` segue o seletor de profissional; `canManageSchedule`. Na sessão cancelada/expirada futura, `candidatesForSlot` lista quem combina com "Oferecer" em 1 clique. Remover com motivo cancela a oferta em aberto. Excluir paciente remove entradas WAITING; anonimização limpa `note`.

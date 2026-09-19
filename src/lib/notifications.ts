@@ -34,6 +34,7 @@ export async function enqueueAppointmentNotification(
           displayName: true,
           onlinePlatform: true,
           organization: { select: { timezone: true } },
+          scheduleSettings: { select: { confirmationTimeoutHours: true } },
         },
       },
     },
@@ -47,6 +48,7 @@ export async function enqueueAppointmentNotification(
     date: formatDateBR(a.startsAt, tz),
     time: slotLabelInTz(a.startsAt, tz),
     platform: PLATFORM_LABEL[a.professional.onlinePlatform ?? "OTHER"],
+    holdHours: String(a.professional.scheduleSettings?.confirmationTimeoutHours ?? 24),
   };
 
   const spec = TEMPLATES[type];
@@ -111,4 +113,36 @@ export async function scheduleReminder(appointmentId: string, startsAt: Date) {
     if (exists) continue;
     await enqueueAppointmentNotification(appointmentId, type, { scheduledFor: at });
   }
+}
+
+/**
+ * Confirmação de entrada na lista de espera. Sem agendamento: a notificação
+ * fica ligada só ao paciente.
+ */
+export async function enqueueWaitlistJoined(entryId: string) {
+  const e = await db.waitlistEntry.findUniqueOrThrow({
+    where: { id: entryId },
+    select: {
+      organizationId: true,
+      patient: { select: { id: true, name: true, whatsapp: true } },
+      professional: { select: { displayName: true } },
+    },
+  });
+  const type = "WAITLIST_JOINED" as const;
+  return db.notification.create({
+    data: {
+      organizationId: e.organizationId,
+      patientId: e.patient.id,
+      channel: "WHATSAPP",
+      type,
+      recipient: e.patient.whatsapp,
+      templateName: TEMPLATES[type].name,
+      payload: {
+        bodyVariables: buildVariables(type, {
+          patientFirstName: e.patient.name.split(" ")[0] ?? e.patient.name,
+          professionalName: e.professional.displayName,
+        }),
+      },
+    },
+  });
 }

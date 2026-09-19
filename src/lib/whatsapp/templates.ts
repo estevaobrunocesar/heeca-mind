@@ -68,6 +68,22 @@ export const TEMPLATES: Record<NotificationType, TemplateSpec> = {
       "Caso queira, entre em contato para verificar novas disponibilidades.",
     variables: ["date", "time"],
   },
+  WAITLIST_JOINED: {
+    name: "hecca_waitlist_joined",
+    reference:
+      "Olá, {{1}}! Você entrou na lista de espera de {{2}}.\n" +
+      "Assim que surgir um horário compatível, avisaremos por aqui com um link para confirmar.",
+    variables: ["patientFirstName", "professionalName"],
+  },
+  WAITLIST_OFFER: {
+    name: "hecca_waitlist_offer",
+    reference:
+      "Olá, {{1}}! Surgiu um horário com {{2}}.\n" +
+      "Modalidade: {{3}}\nData: {{4}}\nHorário: {{5}}\n" +
+      "Ele fica reservado para você por {{6}}h. Clique abaixo para confirmar ou recusar.",
+    variables: ["patientFirstName", "professionalName", "modality", "date", "time", "holdHours"],
+    urlButton: { index: 0, baseUrl: "/confirmar/" },
+  },
   RESCHEDULE: {
     name: "hecca_reschedule",
     reference:

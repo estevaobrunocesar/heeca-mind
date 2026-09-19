@@ -13,6 +13,7 @@ import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleRemi
 import { canManageSchedule } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { getAppointmentInTenant } from "@/lib/tenant";
+import { syncWaitlistForAppointment } from "@/lib/waitlist";
 import { dateTimeInTz, formatDateTimeBR } from "@/lib/time";
 import {
   adminNoteSchema,
@@ -218,6 +219,7 @@ async function transition(appointmentId: string, action: AppointmentAction, extr
     before: { status: before.status },
     after: { status: after.status, ...extra },
   });
+  await syncWaitlistForAppointment(appointmentId); // oferta da lista de espera, se houver
   revalidatePath("/agenda");
   revalidatePath(`/agenda/${appointmentId}`);
   return { before, after };

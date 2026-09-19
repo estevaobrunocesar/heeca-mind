@@ -11,6 +11,10 @@ import { AdminNoteForm, OnlineLinkForm, StatusActions } from "./appointment-acti
 import { PaymentSection } from "./payment-section";
 import { canViewFinancials } from "@/lib/permissions";
 import { canWriteFor } from "@/lib/clinical";
+import { canManageSchedule } from "@/lib/permissions";
+import { candidatesForSlot } from "@/lib/waitlist";
+import { describePrefs } from "@/lib/waitlist-match";
+import { WaitlistOfferBlock } from "./waitlist-offer";
 
 export const metadata: Metadata = { title: "Sessão" };
 
@@ -54,6 +58,10 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
   const day = toLocalFields(a.startsAt, tz).date;
   const badge = TONE_BADGE[STATUS_TONE[a.status]];
 
+  // Vagou? Só para sessões futuras canceladas/expiradas, e só para quem gerencia esta agenda.
+  const freed = (a.status.startsWith("CANCELLED") || a.status === "EXPIRED") && a.startsAt > new Date() && canManageSchedule(actor, a.professionalId);
+  const candidates = freed ? await candidatesForSlot(a.professionalId, { startsAt: a.startsAt, modality: a.modality }, tz) : [];
+
   return (
     <>
       <PageHeader
@@ -81,6 +89,20 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
             )}
           </section>
 
+          {freed && (
+            <WaitlistOfferBlock
+              appointmentId={a.id}
+              slotLabel={`${formatDateTimeBR(a.startsAt, tz)} · ${a.modality === "ONLINE" ? "online" : "presencial"}`}
+              candidates={candidates.map((c) => ({
+                id: c.id,
+                patientName: c.patient.name,
+                priority: c.priority,
+                waitingSince: toLocalFields(c.createdAt, tz).date.split("-").reverse().join("/"),
+                prefs: describePrefs({ modality: c.modality === "HYBRID" ? null : c.modality, weekdays: c.weekdays, periods: c.periods }),
+              }))}
+            />
+          )}
+
           <section className="card">
             <h2 className="mb-2 text-base font-semibold">Detalhes</h2>
             <dl className="divide-y divide-border">
@@ -93,7 +115,7 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
                 </Row>
               )}
               <Row label="Origem">
-                {a.source === "PUBLIC_PAGE" ? "Página pública" : a.source === "RECURRING" ? "Recorrência" : "Manual"}
+                {a.source === "PUBLIC_PAGE" ? "Página pública" : a.source === "RECURRING" ? "Recorrência" : a.source === "WAITLIST" ? "Lista de espera" : "Manual"}
                 {a.series && (
                   <span className="text-text-muted">
                     {" "}· série {a.series.frequency === "WEEKLY" ? "semanal" : "quinzenal"}

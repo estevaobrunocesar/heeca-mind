@@ -17,6 +17,8 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   SESSION_LINK: "Link da sessão",
   CANCELLATION: "Cancelamento",
   RESCHEDULE: "Reagendamento",
+  WAITLIST_JOINED: "Lista de espera",
+  WAITLIST_OFFER: "Oferta de horário",
 };
 
 const STATUS_UI: Record<NotificationStatus, { label: string; cls: string }> = {

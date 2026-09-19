@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleReminder } from "@/lib/notifications";
+import { syncWaitlistForAppointment } from "@/lib/waitlist";
 import { clientIp, rateLimit, retryMessage, RULES } from "@/lib/rate-limit";
 
 /**
@@ -47,6 +48,7 @@ export async function confirmByTokenAction(token: string): Promise<{ ok: boolean
   await audit(null, { organizationId: a.organizationId, action: "appointment.confirm", entityType: "Appointment", entityId: a.id, after: { by: "patient_token" } });
   await enqueueAppointmentNotification(a.id, "BOOKING_CONFIRMED");
   await scheduleReminder(a.id, a.startsAt);
+  await syncWaitlistForAppointment(a.id);
   revalidatePath(`/confirmar/${token}`);
   return { ok: true, message: "Horário confirmado. Até lá!" };
 }
@@ -77,6 +79,7 @@ export async function cancelByTokenAction(token: string): Promise<{ ok: boolean;
   await audit(null, { organizationId: a.organizationId, action: "appointment.cancel_by_patient", entityType: "Appointment", entityId: a.id, after: { by: "patient_token" } });
   await cancelQueuedNotifications(a.id);
   await enqueueAppointmentNotification(a.id, "CANCELLATION");
+  await syncWaitlistForAppointment(a.id);
   revalidatePath(`/confirmar/${token}`);
   return { ok: true, message: "Agendamento cancelado." };
 }

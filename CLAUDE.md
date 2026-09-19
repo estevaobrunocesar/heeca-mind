@@ -52,7 +52,7 @@ prisma/                schema, migrations, seed
 | 2 Configuração do consultório | ✅ perfil, grade semanal, regras, bloqueios/exceções, políticas |
 | 3 Serviços | ✅ CRUD, ordenação, ativar/desativar, exclusão protegida |
 | 4 Agenda | ✅ dia/semana/mês, criação manual + recorrência, transições de status, reagendar, cancelar série |
-| 5 Pacientes | ⬜ schema pronto |
+| 5 Pacientes | ✅ listagem com busca/filtros, ficha com histórico e indicadores, criar/editar, exclusão lógica LGPD + restauração |
 | 6 Agendamento público | ✅ modalidade → mês → dia → horário → dados + LGPD; confirmação/cancelamento por token |
 | 7 WhatsApp | ✅ dispatcher com retry, webhook (status + respostas), expiração de pendentes, link de sessão, painel /mensagens — falta só credenciais reais da Meta |
 | 8 Dashboard | 🟡 contadores básicos |
@@ -97,3 +97,9 @@ prisma/                schema, migrations, seed
 - Respostas do paciente: `src/lib/whatsapp/replies.ts` (puro, testado). "não" fora do prazo vira `RESCHEDULE_REQUESTED`, não cancela.
 - Botões de URL nos templates usam sempre `confirmationToken` como sufixo (`/confirmar/<token>`, `/sessao/<token>`).
 - Sem credenciais da Meta, `ConsoleWhatsAppProvider` loga e marca como SENT — não confundir com entrega real.
+
+## Pacientes
+
+- Identidade = (organizationId, whatsapp). Criação manual e pública passam pela mesma unicidade; número de paciente excluído bloqueia recriação e sugere restaurar.
+- Exclusão é lógica (`deletedAt`), bloqueada com sessões futuras ativas; encerra `RecurringSeries`. Só OWNER/PROFESSIONAL (`canDeletePatient`). Anonimização definitiva por prazo de retenção é job futuro.
+- A ficha mostra só administrativo; o bloco "Prontuário" é placeholder até o módulo clínico (`canAccessClinicalData`).

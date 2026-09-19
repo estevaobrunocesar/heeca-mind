@@ -39,6 +39,11 @@ export function canViewFinancials(actor: Actor, professionalId: string): boolean
   return actor.professionalId === professionalId;
 }
 
+/** Pode excluir (logicamente) um paciente? Recepção não — é decisão do profissional. */
+export function canDeletePatient(actor: Actor): boolean {
+  return actor.role === "OWNER" || actor.role === "PROFESSIONAL";
+}
+
 /** Pode gerenciar membros da organização (convidar, remover, alterar papel)? */
 export function canManageMembers(actor: Actor): boolean {
   return actor.role === "OWNER";

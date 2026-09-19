@@ -14,11 +14,13 @@ export function NewAppointmentForm({
   patients,
   defaultDate,
   defaultTime,
+  defaultPatientId,
 }: {
   services: ServiceOpt[];
   patients: PatientOpt[];
   defaultDate: string;
   defaultTime?: string;
+  defaultPatientId?: string;
 }) {
   const [state, action] = useActionState<FormState, FormData>(createAppointmentAction, {});
   const fe = state.fieldErrors;
@@ -67,7 +69,7 @@ export function NewAppointmentForm({
             label="Selecione"
             name="patientId"
             options={patients.map((p) => ({ value: p.id, label: `${p.name} · ${p.whatsapp}` }))}
-            defaultValue={v?.patientId ?? patients[0]?.id}
+            defaultValue={v?.patientId ?? defaultPatientId ?? patients[0]?.id}
             errors={fe?.patientId}
           />
         ) : (

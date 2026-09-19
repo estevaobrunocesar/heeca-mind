@@ -41,11 +41,12 @@ export default async function NewAppointmentPage({ searchParams }: PageProps<"/a
 
   const defaultDate = typeof sp.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayCivil(new Date(), org.timezone);
   const defaultTime = typeof sp.time === "string" && /^\d{2}:\d{2}$/.test(sp.time) ? sp.time : undefined;
+  const defaultPatientId = typeof sp.patientId === "string" && patients.some((x) => x.id === sp.patientId) ? sp.patientId : undefined;
 
   return (
     <>
       <PageHeader title="Nova sessão" description="Agendamento manual — para quem combinou direto com você." />
-      <NewAppointmentForm services={services} patients={patients} defaultDate={defaultDate} defaultTime={defaultTime} />
+      <NewAppointmentForm services={services} patients={patients} defaultDate={defaultDate} defaultTime={defaultTime} defaultPatientId={defaultPatientId} />
     </>
   );
 }

@@ -134,3 +134,10 @@ prisma/                schema, migrations, seed
 - Liberação: a action de `/login/mfa` grava `MfaVerification(sid)` e chama `unstable_update({ user: { mfaPending: false } })`. O callback `jwt` (versão Node, em `src/auth.ts`) só zera `mfaPending` se a linha existir para aquele `sid` — um `update()` vindo do cliente sem código não muda nada (testado).
 - Segredo TOTP fica cifrado (`mfaSecretEnc`, AES-GCM). Operações sensíveis (desativar, regenerar códigos) exigem código atual. Rate limit `mfa:user` 10/15 min.
 - `qrcode` é a única dependência nova (QR do `otpauth://`).
+
+## Sessões e revogação
+
+- `user_sessions`: uma linha por login (`sid` do JWT), com IP/dispositivo/último uso. `requireActor()`/`getActor()` chamam `assertActive(sid)` em toda requisição — JWT revogado ou sem linha cai em `/login?revoked=1`. O proxy (edge) não consulta banco; quem derruba é a página/action.
+- Revogação automática: redefinir senha revoga todas; ativar MFA revoga as outras. Manual em `/configuracoes/seguranca` (uma ou "sair dos outros dispositivos"). Auditoria `auth.session_revoke*`.
+- `lastSeenAt` é atualizado no máximo a cada 5 min (melhor esforço). Cron apaga expiradas/revogadas com >30 dias.
+- Após um deploy que introduza esta tabela, JWTs antigos (sem linha) exigem novo login uma vez.

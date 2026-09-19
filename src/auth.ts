@@ -5,6 +5,7 @@ import { compare } from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "./auth.config";
 import { db } from "./lib/db";
+import { createUserSession } from "./lib/sessions";
 
 const credentialsSchema = z.object({
   email: z.string().email().transform((v) => v.trim().toLowerCase()),
@@ -69,6 +70,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
         await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
+        const sid = randomUUID();
+        await createUserSession({ sid, userId: user.id, ip, userAgent });
+
         return {
           id: user.id,
           email: user.email,
@@ -76,7 +80,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           organizationId: membership.organizationId,
           role: membership.role,
           professionalId: user.professional?.id ?? null,
-          sid: randomUUID(),
+          sid,
           mfaPending: user.mfaEnabled,
         };
       },

@@ -71,6 +71,7 @@ model User {
   professional        Professional?
   passwordResetTokens PasswordResetToken[]
   mfaVerifications    MfaVerification[]
+  sessions            UserSession[]
   accessLogs          AccessLog[]
   auditLogs           AuditLog[]
   clinicalNotes       ClinicalNote[]
@@ -104,6 +105,26 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+}
+
+/// Uma linha por login (o `sid` do JWT). Permite listar dispositivos e
+/// revogar: requireActor() confere esta tabela a cada requisição.
+model UserSession {
+  sid           String    @id
+  userId        String
+  createdAt     DateTime  @default(now())
+  lastSeenAt    DateTime  @default(now())
+  expiresAt     DateTime
+  ip            String?
+  userAgent     String?
+  revokedAt     DateTime?
+  revokedReason String? // "user" | "password_reset" | "mfa_enabled" | "admin"
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
 }
 
 /// Prova, no servidor, de que a sessão `sid` passou pelo segundo fator.

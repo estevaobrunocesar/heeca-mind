@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { formValues, invalid, type FormState } from "@/lib/form";
 import { clientIp, rateLimitAll, retryMessage, RULES } from "@/lib/rate-limit";
+import { revokeAllSessions } from "@/lib/sessions";
 import { slugify } from "@/lib/slug";
 import {
   loginSchema,
@@ -171,6 +172,9 @@ export async function resetPasswordAction(
       data: { usedAt: new Date() },
     }),
   ]);
+
+  // Quem tinha a senha antiga (ou roubou uma sessão) perde o acesso.
+  await revokeAllSessions(record.userId, "password_reset");
 
   redirect("/login?reset=1");
 }

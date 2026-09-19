@@ -3,16 +3,22 @@ import { db } from "@/lib/db";
 import { requireActor } from "@/lib/session";
 import { formatDateBR } from "@/lib/time";
 import { MfaPanel } from "./mfa-panel";
+import { SessionsPanel } from "./sessions-panel";
+import { auth } from "@/auth";
+import { describeUserAgent, listActiveSessions } from "@/lib/sessions";
+import { formatDateTimeBR } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Segurança" };
 
 export default async function SecurityPage({ searchParams }: PageProps<"/configuracoes/seguranca">) {
   const sp = await searchParams;
   const actor = await requireActor();
-  const [user, org, logins] = await Promise.all([
+  const currentSid = (await auth())?.user.sid;
+  const [user, org, logins, sessions] = await Promise.all([
     db.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { mfaEnabled: true, mfaEnabledAt: true, mfaRecoveryHashes: true, email: true } }),
     db.organization.findUniqueOrThrow({ where: { id: actor.organizationId }, select: { timezone: true } }),
     db.accessLog.findMany({ where: { userId: actor.userId }, orderBy: { createdAt: "desc" }, take: 10, select: { createdAt: true, success: true, ip: true, userAgent: true } }),
+    listActiveSessions(actor.userId),
   ]);
 
   return (
@@ -22,6 +28,16 @@ export default async function SecurityPage({ searchParams }: PageProps<"/configu
         enabledAt={user.mfaEnabledAt ? formatDateBR(user.mfaEnabledAt, org.timezone) : null}
         recoveryLeft={user.mfaRecoveryHashes.length}
         lowWarning={sp.low === "1"}
+      />
+      <SessionsPanel
+        sessions={sessions.map((x) => ({
+          sid: x.sid,
+          device: describeUserAgent(x.userAgent),
+          ip: x.ip,
+          createdAt: formatDateTimeBR(x.createdAt, org.timezone),
+          lastSeenAt: formatDateTimeBR(x.lastSeenAt, org.timezone),
+          current: x.sid === currentSid,
+        }))}
       />
       <section className="card">
         <h2 className="text-base font-semibold">Últimos acessos</h2>

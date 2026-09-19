@@ -5,6 +5,8 @@ import QRCode from "qrcode";
 import { audit } from "@/lib/audit";
 import { beginEnrollment, confirmEnrollment, disableMfa, regenerateRecoveryCodes, requireCurrentCode } from "@/lib/mfa/service";
 import { requireActor } from "@/lib/session";
+import { auth } from "@/auth";
+import { revokeAllSessions, revokeSession } from "@/lib/sessions";
 
 export type EnrollmentStart = { secret: string; qrDataUrl: string };
 
@@ -20,6 +22,9 @@ export async function confirmMfaAction(code: string): Promise<{ ok: true; recove
   const actor = await requireActor();
   const r = await confirmEnrollment(actor.userId, code);
   if (r.ok) {
+    // As outras sessões não passaram pelo segundo fator: derruba.
+    const current = (await auth())?.user.sid;
+    await revokeAllSessions(actor.userId, "mfa_enabled", current);
     await audit(actor, { organizationId: actor.organizationId, action: "auth.mfa_enable", entityType: "User", entityId: actor.userId });
     revalidatePath("/configuracoes/seguranca");
   }
@@ -44,4 +49,25 @@ export async function disableMfaAction(code: string): Promise<{ ok: true } | { o
   await audit(actor, { organizationId: actor.organizationId, action: "auth.mfa_disable", entityType: "User", entityId: actor.userId });
   revalidatePath("/configuracoes/seguranca");
   return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────
+// Sessões
+// ──────────────────────────────────────────────────────────────
+
+export async function revokeSessionAction(sid: string): Promise<{ ok: boolean }> {
+  const actor = await requireActor();
+  const ok = await revokeSession(sid, actor.userId, "user");
+  if (ok) await audit(actor, { organizationId: actor.organizationId, action: "auth.session_revoke", entityType: "User", entityId: actor.userId, after: { sid } });
+  revalidatePath("/configuracoes/seguranca");
+  return { ok };
+}
+
+export async function revokeOtherSessionsAction(): Promise<{ revoked: number }> {
+  const actor = await requireActor();
+  const current = (await auth())?.user.sid;
+  const revoked = await revokeAllSessions(actor.userId, "user", current);
+  await audit(actor, { organizationId: actor.organizationId, action: "auth.session_revoke_all", entityType: "User", entityId: actor.userId, after: { revoked } });
+  revalidatePath("/configuracoes/seguranca");
+  return { revoked };
 }

@@ -5,11 +5,12 @@ import { useActionState } from "react";
 import { Field, FormError, FormSuccess, SubmitButton } from "@/components/ui/form";
 import { loginAction, type FormState } from "../actions";
 
-export function LoginForm({ justReset }: { justReset: boolean }) {
+export function LoginForm({ justReset, revoked }: { justReset: boolean; revoked: boolean }) {
   const [state, action] = useActionState<FormState, FormData>(loginAction, {});
   return (
     <form action={action} className="space-y-4">
       {justReset && <FormSuccess message="Senha redefinida. Entre com a nova senha." />}
+      {revoked && <FormError message="Sua sessão foi encerrada. Entre novamente." />}
       <FormError message={state.error} />
       <Field
         label="E-mail"

@@ -238,7 +238,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
                 </Link>
               </>
             ) : (
-              <p className="text-sm text-text-muted">Acesso restrito ao profissional responsável (sigilo, CFP art. 9).</p>
+              <p className="text-sm text-text-muted">Acesso restrito ao profissional responsável ou a quem ele delegar (sigilo, CFP art. 9).</p>
             )}
           </section>
 

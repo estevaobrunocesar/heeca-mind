@@ -9,7 +9,8 @@ import { requireActor } from "@/lib/session";
 import { formatDateTimeBR, slotLabelInTz, toLocalFields } from "@/lib/time";
 import { AdminNoteForm, OnlineLinkForm, StatusActions } from "./appointment-actions";
 import { PaymentSection } from "./payment-section";
-import { canAccessClinicalData, canViewFinancials } from "@/lib/permissions";
+import { canViewFinancials } from "@/lib/permissions";
+import { canWriteFor } from "@/lib/clinical";
 
 export const metadata: Metadata = { title: "Sessão" };
 
@@ -127,7 +128,7 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
             <AdminNoteForm id={a.id} note={a.adminNote} />
           </section>
 
-          {canAccessClinicalData(actor, a.professionalId) && !a.status.startsWith("CANCELLED") && a.status !== "EXPIRED" && (
+          {!a.status.startsWith("CANCELLED") && a.status !== "EXPIRED" && (await canWriteFor(actor, a.patient.id, a.professionalId)) && (
             <section className="card flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">Evolução clínica</h2>

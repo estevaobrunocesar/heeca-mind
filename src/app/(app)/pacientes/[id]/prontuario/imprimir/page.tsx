@@ -29,7 +29,7 @@ export default async function PrintClinicalRecordPage({ params }: PageProps<"/pa
   const tz = patient.organization.timezone;
   const notes = (await listNotes(actor, id)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const documents = (await listDocuments(actor, id)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  await logExport(actor, notes.map((n) => n.id));
+  await logExport(actor, id, notes.map((n) => n.id));
 
   return (
     <main className="mx-auto max-w-3xl bg-white p-8 text-[13px] leading-relaxed text-black print:p-0">
@@ -54,7 +54,10 @@ export default async function PrintClinicalRecordPage({ params }: PageProps<"/pa
             {i + 1}. {KIND_LABEL[n.kind]} — {formatDateTimeBR(n.createdAt, tz)}
             {n.appointment && <span className="font-normal"> · sessão de {formatDateTimeBR(n.appointment.startsAt, tz)} ({n.appointment.serviceNameSnapshot})</span>}
           </h2>
-          <p className="text-xs text-neutral-600">Registrado por {n.authorName}</p>
+          <p className="text-xs text-neutral-600">
+            Registrado por {n.authorName}
+            {n.viaDelegation && " (em substituição)"}
+          </p>
           <p className="mt-1 whitespace-pre-wrap">{n.content}</p>
         </article>
       ))}

@@ -37,13 +37,14 @@ model Organization {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  memberships   Membership[]
-  professionals Professional[]
-  patients      Patient[]
-  appointments  Appointment[]
-  notifications Notification[]
-  auditLogs     AuditLog[]
-  invitations   Invitation[]
+  memberships         Membership[]
+  professionals       Professional[]
+  patients            Patient[]
+  appointments        Appointment[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  invitations         Invitation[]
+  clinicalDelegations ClinicalDelegation[]
 
   @@map("organizations")
 }
@@ -78,6 +79,7 @@ model User {
   auditLogs           AuditLog[]
   clinicalNotes       ClinicalNote[]
   clinicalDocuments   ClinicalDocument[]
+  clinicalDelegations ClinicalDelegation[]
 
   @@map("users")
 }
@@ -220,18 +222,20 @@ model Professional {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user              User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  services          Service[]
-  scheduleSettings  ScheduleSettings?
-  policy            ProfessionalPolicy?
-  availability      AvailabilityRule[]
-  blocks            ScheduleBlock[]
-  exceptions        ScheduleException[]
-  appointments      Appointment[]
-  recurringSeries   RecurringSeries[]
-  clinicalNotes     ClinicalNote[]
-  clinicalDocuments ClinicalDocument[]
+  organization                Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                        User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  services                    Service[]
+  scheduleSettings            ScheduleSettings?
+  policy                      ProfessionalPolicy?
+  availability                AvailabilityRule[]
+  blocks                      ScheduleBlock[]
+  exceptions                  ScheduleException[]
+  appointments                Appointment[]
+  recurringSeries             RecurringSeries[]
+  clinicalNotes               ClinicalNote[]
+  clinicalDocuments           ClinicalDocument[]
+  clinicalDelegationsGranted  ClinicalDelegation[] @relation("DelegationsGranted")
+  clinicalDelegationsReceived ClinicalDelegation[] @relation("DelegationsReceived")
 
   @@index([organizationId])
   @@map("professionals")
@@ -397,13 +401,14 @@ model Patient {
   deletedAt          DateTime? // exclusão lógica (política de retenção LGPD)
   anonymizedAt       DateTime? // anonimização irreversível após o prazo de retenção
 
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  appointments      Appointment[]
-  recurringSeries   RecurringSeries[]
-  clinicalNotes     ClinicalNote[]
-  clinicalDocuments ClinicalDocument[]
-  notifications     Notification[]
-  receipts          Receipt[]
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointments        Appointment[]
+  recurringSeries     RecurringSeries[]
+  clinicalNotes       ClinicalNote[]
+  clinicalDocuments   ClinicalDocument[]
+  clinicalDelegations ClinicalDelegation[]
+  notifications       Notification[]
+  receipts            Receipt[]
 
   @@unique([organizationId, whatsapp])
   @@index([organizationId, name])
@@ -654,6 +659,8 @@ model ClinicalNote {
   authorUserId   String // quem escreveu
   appointmentId  String?
 
+  delegationId String? // preenchido quando registrada por substituto
+
   kind          ClinicalNoteKind @default(NOTE)
   contentEnc    String // base64: iv + tag + ciphertext
   createdAt     DateTime         @default(now())
@@ -665,6 +672,7 @@ model ClinicalNote {
   professional Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   author       User                @relation(fields: [authorUserId], references: [id])
   appointment  Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  delegation   ClinicalDelegation? @relation(fields: [delegationId], references: [id], onDelete: SetNull)
   accessLogs   ClinicalAccessLog[]
 
   @@index([patientId, createdAt])
@@ -676,17 +684,60 @@ model ClinicalAccessLog {
   id                 String   @id @default(cuid())
   clinicalNoteId     String?
   clinicalDocumentId String?
+  delegationId       String? // acesso feito por delegação (supervisão/substituição)
   userId             String
   action             String // READ | WRITE | DELETE | EXPORT
   ip                 String?
   createdAt          DateTime @default(now())
 
-  clinicalNote     ClinicalNote?     @relation(fields: [clinicalNoteId], references: [id], onDelete: Cascade)
-  clinicalDocument ClinicalDocument? @relation(fields: [clinicalDocumentId], references: [id], onDelete: Cascade)
+  clinicalNote     ClinicalNote?       @relation(fields: [clinicalNoteId], references: [id], onDelete: Cascade)
+  clinicalDocument ClinicalDocument?   @relation(fields: [clinicalDocumentId], references: [id], onDelete: Cascade)
+  delegation       ClinicalDelegation? @relation(fields: [delegationId], references: [id], onDelete: SetNull)
 
   @@index([clinicalNoteId, createdAt])
   @@index([clinicalDocumentId, createdAt])
   @@map("clinical_access_logs")
+}
+
+enum ClinicalDelegationKind {
+  SUPERVISION // supervisor lê
+  SUBSTITUTION // substituto lê e registra
+}
+
+/// Ato explícito do profissional responsável dando a um colega da mesma
+/// organização acesso ao prontuário de um paciente (ou de todos os seus),
+/// por prazo determinado. Regras puras em src/lib/clinical-delegation.ts.
+model ClinicalDelegation {
+  id                     String  @id @default(cuid())
+  organizationId         String
+  patientId              String? // null = todos os pacientes do titular
+  grantorProfessionalId  String // titular do prontuário
+  delegateProfessionalId String // quem recebe o acesso
+  createdByUserId        String
+
+  kind      ClinicalDelegationKind
+  canWrite  Boolean // derivado do tipo (substituição), gravado para auditoria
+  reason    String
+  startsAt  DateTime
+  expiresAt DateTime
+
+  revokedAt     DateTime?
+  revokedReason String?
+  createdAt     DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient      Patient?     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  grantor      Professional @relation("DelegationsGranted", fields: [grantorProfessionalId], references: [id], onDelete: Cascade)
+  delegate     Professional @relation("DelegationsReceived", fields: [delegateProfessionalId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdByUserId], references: [id])
+
+  notes      ClinicalNote[]
+  documents  ClinicalDocument[]
+  accessLogs ClinicalAccessLog[]
+
+  @@index([delegateProfessionalId, expiresAt])
+  @@index([grantorProfessionalId, expiresAt])
+  @@map("clinical_delegations")
 }
 
 enum ClinicalDocumentKind {
@@ -709,6 +760,7 @@ model ClinicalDocument {
   professionalId String // profissional responsável
   authorUserId   String
   appointmentId  String?
+  delegationId   String? // preenchido quando anexado por substituto
 
   kind           ClinicalDocumentKind @default(OTHER)
   titleEnc       String
@@ -726,6 +778,7 @@ model ClinicalDocument {
   professional Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   author       User                @relation(fields: [authorUserId], references: [id])
   appointment  Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  delegation   ClinicalDelegation? @relation(fields: [delegationId], references: [id], onDelete: SetNull)
   accessLogs   ClinicalAccessLog[]
 
   @@index([patientId, createdAt])

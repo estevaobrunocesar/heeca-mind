@@ -14,7 +14,7 @@ const KINDS: Array<{ value: ClinicalNoteKind; label: string; hint: string }> = [
   { value: "ASSESSMENT", label: "Avaliação", hint: "Avaliação psicológica, relatório, encaminhamento." },
 ];
 
-export function NewNoteForm({ patientId, sessions, defaultAppointmentId }: { patientId: string; sessions: SessionOpt[]; defaultAppointmentId?: string }) {
+export function NewNoteForm({ patientId, sessions, defaultAppointmentId, targetName }: { patientId: string; sessions: SessionOpt[]; defaultAppointmentId?: string; targetName?: string }) {
   const [state, action] = useActionState<FormState, FormData>(createClinicalNoteAction.bind(null, patientId), {});
   const [kind, setKind] = useState<ClinicalNoteKind>(state.values?.kind as ClinicalNoteKind | undefined ?? (defaultAppointmentId ? "EVOLUTION" : sessions.length ? "EVOLUTION" : "NOTE"));
   const fe = state.fieldErrors;
@@ -23,7 +23,10 @@ export function NewNoteForm({ patientId, sessions, defaultAppointmentId }: { pat
     <form action={action} className="card space-y-4" key={state.ok ? "saved" : "editing"}>
       <div>
         <h2 className="text-base font-semibold">Nova anotação</h2>
-        <p className="mt-1 text-sm text-text-muted">Cifrada no banco. Imutável após salvar — se errar, exclua com motivo e registre de novo.</p>
+        <p className="mt-1 text-sm text-text-muted">
+          {targetName ? `Será registrada no prontuário de ${targetName}, assinada por você (substituição). ` : ""}
+          Cifrada no banco. Imutável após salvar — se errar, exclua com motivo e registre de novo.
+        </p>
       </div>
       <FormError message={state.error} />
       {state.ok && <FormSuccess message="Anotação registrada." />}

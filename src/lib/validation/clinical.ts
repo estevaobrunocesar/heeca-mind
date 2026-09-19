@@ -28,3 +28,17 @@ export const clinicalDocumentSchema = z.object({
 });
 
 export const deleteDocumentSchema = deleteNoteSchema;
+
+export const delegationSchema = z.object({
+  delegateProfessionalId: z.string().trim().min(1, "Escolha o profissional"),
+  patientId: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? null : v)),
+  kind: z.enum(["SUPERVISION", "SUBSTITUTION"], { message: "Escolha o tipo" }),
+  reason: z.string().trim().min(5, "Explique o motivo (ex.: férias 20–30/09, supervisão do caso)").max(200, "Máximo de 200 caracteres"),
+  startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inicial inválida"),
+  endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data final inválida"),
+});
+
+export const revokeDelegationSchema = deleteNoteSchema;

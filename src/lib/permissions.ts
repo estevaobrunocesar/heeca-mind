@@ -78,11 +78,11 @@ export function canManageMembers(actor: Actor): boolean {
  *  - O OWNER de uma clínica pode ser um administrador sem CRP. Mesmo sendo
  *    psicólogo, ele só vê os SEUS pacientes.
  *  - RECEPTIONIST nunca.
- *  - Supervisão, substituição em férias e transferência de paciente são
- *    casos reais, mas exigem um ato explícito e auditado (delegação com
- *    prazo), não uma exceção implícita por papel. Ficam para um módulo de
- *    delegação; até lá, a transferência é feita pelo próprio profissional
- *    via impressão/exportação.
+ *  - Supervisão e substituição em férias são casos reais, mas exigem um
+ *    ato explícito e auditado do titular: ClinicalDelegation, com prazo e
+ *    motivo (src/lib/clinical-delegation.ts). Esta função continua sendo o
+ *    portão do PRÓPRIO prontuário; a delegação é resolvida em
+ *    clinicalScopes (src/lib/clinical.ts) e nunca por papel.
  *
  * Toda leitura permitida gera um ClinicalAccessLog (src/lib/clinical.ts).
  */

@@ -164,7 +164,8 @@ prisma/                schema, migrations, seed
 
 ## Prontuário (dados clínicos)
 
-- Regra de acesso decidida em 2026-09-19: `canAccessClinicalData` (pura) = ator é PROFESSIONAL/OWNER **com perfil** e é exatamente o profissional; + `isTreatingProfessional` (banco) = tem/teve sessão com o paciente. Dono sem perfil, dono-psicólogo de outro paciente e recepção: nunca. O seletor de profissional (`activeProfessionalId`) NÃO transfere acesso clínico. Supervisão/substituição virão por delegação explícita e auditada.
+- Regra de acesso decidida em 2026-09-19: `canAccessClinicalData` (pura) = ator é PROFESSIONAL/OWNER **com perfil** e é exatamente o profissional; + `isTreatingProfessional` (banco) = tem/teve sessão com o paciente. Dono sem perfil, dono-psicólogo de outro paciente e recepção: nunca. O seletor de profissional (`activeProfessionalId`) NÃO transfere acesso clínico. Supervisão/substituição só por delegação explícita (seção abaixo).
+- **Escopos.** `clinicalScopes(actor, patientId)` devolve os prontuários que o ator vê: o próprio (`delegationId: null`) + um por delegação ativa. `requireClinicalAccess` lança se vazio; `pickWriteScope` decide onde uma nota nova entra (próprio antes de substituição); `canDeleteClinicalEntry` decide exclusão. Nunca filtrar notas por `actor.professionalId` direto — sempre pelos escopos.
 - `src/lib/clinical.ts` é o único lugar que cifra/decifra (`crypto.ts`) e registra `ClinicalAccessLog` (READ/WRITE/DELETE/EXPORT). Actions do prontuário não chamam `audit()` — conteúdo clínico nunca entra em `audit_logs`, notificações ou e-mails.
 - Notas são imutáveis; exclusão é lógica com motivo e mantém o conteúdo cifrado até a anonimização LGPD (dever de guarda, CFP 001/2009).
 - Tipos: EVOLUTION (vinculada a sessão; uma por sessão), NOTE, ASSESSMENT. `/pacientes/[id]/prontuario/imprimir` gera a versão para PDF e registra EXPORT.
@@ -178,3 +179,12 @@ prisma/                schema, migrations, seed
 - Log: WRITE no upload, READ ao abrir/baixar (não ao listar — listar decifra só metadados), DELETE na exclusão. `ClinicalAccessLog` aponta para nota **ou** documento.
 - Exclusão é lógica com motivo; o blob fica até a anonimização, que apaga linhas (na transação) e blobs (depois, via `purgeDocumentBlobs`; falhas vão para o log do cron e para o `audit.after.blobsFailed`). `npm run check:lgpd` cobre linha + blob.
 - A impressão lista os anexos como índice ("entregues em separado"); não embute o conteúdo.
+
+## Delegação de acesso clínico (supervisão / substituição)
+
+- `ClinicalDelegation`: o **titular** (profissional do ator) concede a outro profissional ativo da mesma organização, com login, acesso ao prontuário de um paciente (`patientId`) ou de todos os seus (`null`), por prazo (máx. 90 dias, nunca retroativo) e com motivo. SUPERVISION = leitura; SUBSTITUTION = leitura + registro. Regras puras e testadas em `src/lib/clinical-delegation.ts`.
+- Delegar **não cria relação clínica**: "todos os pacientes" só abre os que o titular de fato atende (`isTreatingProfessional` do titular, checado a cada uso). Dono e recepção não delegam nem recebem; ninguém delega o prontuário de outro.
+- Nota/documento registrado em substituição leva `professionalId` do titular (o prontuário é dele), `authorUserId` do substituto e `delegationId`. A UI mostra "(em substituição)". O substituto exclui só o que ele mesmo escreveu; supervisor não escreve nem exclui.
+- Todo acesso por delegação grava `delegationId` no `ClinicalAccessLog`; o painel "Acessos recentes" do titular mostra "· supervisão/substituição". Conceder/revogar são auditados em `audit_logs` (`clinical_delegation.grant|revoke`) — metadados, nunca conteúdo.
+- Revogação vale na requisição seguinte (escopos são resolvidos a cada acesso, sem cache). Gestão em `/configuracoes/delegacoes`; o prontuário mostra "Compartilhado com" para o titular e um aviso para o delegado.
+- Detalhe da sessão usa `canWriteFor(actor, patientId, professionalId)` para o botão "Registrar evolução" — próprio ou substituição.

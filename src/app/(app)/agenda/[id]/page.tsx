@@ -8,6 +8,8 @@ import { formatBRL } from "@/lib/money";
 import { requireActor } from "@/lib/session";
 import { formatDateTimeBR, slotLabelInTz, toLocalFields } from "@/lib/time";
 import { AdminNoteForm, OnlineLinkForm, StatusActions } from "./appointment-actions";
+import { PaymentSection } from "./payment-section";
+import { canViewFinancials } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Sessão" };
 
@@ -38,7 +40,7 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
   const a = await db.appointment.findFirst({
     where: { id, organizationId: actor.organizationId },
     include: {
-      patient: { select: { id: true, name: true, whatsapp: true, email: true } },
+      patient: { select: { id: true, name: true, whatsapp: true, email: true, preferredPaymentMethod: true, needsReceipt: true } },
       professional: { select: { displayName: true, onlineFixedLink: true, organization: { select: { timezone: true } } } },
       series: { select: { id: true, frequency: true, isActive: true } },
       payments: { orderBy: { paidAt: "desc" } },
@@ -124,6 +126,16 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
         </div>
 
         <aside className="space-y-6">
+          {canViewFinancials(actor, a.professionalId) && (
+            <PaymentSection
+              appointmentId={a.id}
+              priceCents={a.priceCents}
+              paymentStatus={a.paymentStatus}
+              payments={a.payments.map((p) => ({ id: p.id, amountCents: p.amountCents, method: p.method, paidAt: p.paidAt.toISOString(), note: p.note }))}
+              preferredMethod={a.patient.preferredPaymentMethod}
+              needsReceipt={a.patient.needsReceipt}
+            />
+          )}
           <section className="card">
             <h2 className="mb-3 text-base font-semibold">Paciente</h2>
             <p className="font-medium">{a.patient.name}</p>

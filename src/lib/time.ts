@@ -128,3 +128,9 @@ export function slotLabelInTz(date: Date, tz: string): string {
   const p = partsInTz(date, tz);
   return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
 }
+
+/** Data civil e mês ("YYYY-MM") de um instante no fuso. */
+export function todayCivilAndMonth(now: Date, tz: string): { date: string; month: string } {
+  const { date } = toLocalFields(now, tz);
+  return { date, month: date.slice(0, 7) };
+}

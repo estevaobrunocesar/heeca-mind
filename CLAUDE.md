@@ -55,8 +55,8 @@ prisma/                schema, migrations, seed
 | 5 Pacientes | ✅ listagem com busca/filtros, ficha com histórico e indicadores, criar/editar, exclusão lógica LGPD + restauração |
 | 6 Agendamento público | ✅ modalidade → mês → dia → horário → dados + LGPD; confirmação/cancelamento por token |
 | 7 WhatsApp | ✅ dispatcher com retry, webhook (status + respostas), expiração de pendentes, link de sessão, painel /mensagens — falta só credenciais reais da Meta |
-| 8 Dashboard | 🟡 contadores básicos |
-| 9 Financeiro | ⬜ schema pronto |
+| 8 Dashboard | ✅ sessões do dia, próxima, pacientes ativos, confirmadas, pendentes, cancelamentos, reagendamentos, online/presencial, faturamento, comparecimento |
+| 9 Financeiro | ✅ pagamento (parcial/integral/isento/desfazer) na sessão, /financeiro por mês com realizado/recebido/a receber/previsto, marcar pago em 1 clique, CSV |
 
 ## Padrões de formulário
 
@@ -103,3 +103,10 @@ prisma/                schema, migrations, seed
 - Identidade = (organizationId, whatsapp). Criação manual e pública passam pela mesma unicidade; número de paciente excluído bloqueia recriação e sugere restaurar.
 - Exclusão é lógica (`deletedAt`), bloqueada com sessões futuras ativas; encerra `RecurringSeries`. Só OWNER/PROFESSIONAL (`canDeletePatient`). Anonimização definitiva por prazo de retenção é job futuro.
 - A ficha mostra só administrativo; o bloco "Prontuário" é placeholder até o módulo clínico (`canAccessClinicalData`).
+
+## Financeiro
+
+- `Payment` é o histórico (uma linha por recebimento); `Appointment.paymentStatus` é o resumo. Parcial mantém PENDING até a soma atingir `priceCents`.
+- "Realizado" = concluídas do mês (por `startsAt`); "Recebido" = `Payment.paidAt` no mês (caixa, independe da data da sessão); "Previsto" = concluídas + confirmadas do mês, passadas ou não — mesma definição no dashboard.
+- Valores só para `canViewFinancials` (profissional dono ou OWNER); recepção não vê.
+- CSV em `/financeiro/export?month=YYYY-MM`: separador `;` e BOM para o Excel pt-BR.

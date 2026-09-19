@@ -8,9 +8,9 @@ export const metadata: Metadata = { title: "Novo serviço" };
 
 export default async function NewServicePage() {
   const actor = await requireActor();
-  const settings = actor.professionalId
+  const settings = actor.activeProfessionalId
     ? await db.scheduleSettings.findUnique({
-        where: { professionalId: actor.professionalId },
+        where: { professionalId: actor.activeProfessionalId },
         select: { defaultDurationMinutes: true },
       })
     : null;

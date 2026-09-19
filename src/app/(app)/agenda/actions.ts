@@ -72,8 +72,8 @@ function describeConflicts(c: Awaited<ReturnType<typeof hardConflicts>>, tz: str
 
 export async function createAppointmentAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const { actor, tz } = await ctx();
-  if (!actor.professionalId) return { error: "Usuário sem perfil profissional" };
-  const professionalId = actor.professionalId;
+  if (!actor.activeProfessionalId) return { error: "Usuário sem perfil profissional" };
+  const professionalId = actor.activeProfessionalId;
   if (!canManageSchedule(actor, professionalId)) return { error: "Sem permissão" };
 
   const parsed = createAppointmentSchema.safeParse(Object.fromEntries(formData));

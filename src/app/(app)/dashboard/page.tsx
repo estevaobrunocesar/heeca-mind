@@ -49,9 +49,9 @@ export default async function DashboardPage() {
   const [y, m] = month.split("-").map(Number);
   const monthEnd = dateTimeInTz(`${m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`}-01`, "00:00", tz);
 
-  const scope = actor.professionalId ? { professionalId: actor.professionalId } : { organizationId: actor.organizationId };
+  const scope = actor.activeProfessionalId ? { professionalId: actor.activeProfessionalId } : { organizationId: actor.organizationId };
   const active = { in: [...ACTIVE_STATUSES] };
-  const showMoney = actor.professionalId ? canViewFinancials(actor, actor.professionalId) : actor.role === "OWNER";
+  const showMoney = actor.activeProfessionalId ? canViewFinancials(actor, actor.activeProfessionalId) : actor.role === "OWNER";
 
   const [todaySessions, nextSession, patientCount, confirmedUpcoming, pendingCount, monthAppts, rescheduleAudits, receivedMonth] = await Promise.all([
     db.appointment.findMany({

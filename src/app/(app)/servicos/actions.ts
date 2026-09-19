@@ -18,9 +18,9 @@ export type ServiceFormState = FormState;
  */
 async function resolveProfessional() {
   const actor = await requireActor();
-  if (!actor.professionalId) throw new Error("Usuário sem perfil profissional");
-  if (!canEditProfessional(actor, actor.professionalId)) throw new Error("Sem permissão");
-  return { actor, professionalId: actor.professionalId };
+  if (!actor.activeProfessionalId) throw new Error("Usuário sem perfil profissional");
+  if (!canEditProfessional(actor, actor.activeProfessionalId)) throw new Error("Sem permissão");
+  return { actor, professionalId: actor.activeProfessionalId };
 }
 
 /** Carrega um serviço garantindo que pertence ao profissional do ator. */

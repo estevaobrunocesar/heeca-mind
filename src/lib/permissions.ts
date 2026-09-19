@@ -12,8 +12,15 @@ export type Actor = {
   userId: string;
   organizationId: string;
   role: MembershipRole;
-  /** id do Professional vinculado ao usuário, se houver */
+  /** id do Professional vinculado ao usuário, se houver ("quem eu sou") */
   professionalId: string | null;
+  /**
+   * Profissional cujas agenda/serviços/configurações estão sendo vistas
+   * ("de quem estou cuidando"). Para PROFESSIONAL é sempre o próprio; para
+   * OWNER/RECEPTIONIST vem do seletor no cabeçalho. null = organização sem
+   * profissionais.
+   */
+  activeProfessionalId: string | null;
 };
 
 // ──────────────────────────────────────────────────────────────
@@ -37,6 +44,11 @@ export function canEditProfessional(actor: Actor, professionalId: string): boole
 export function canViewFinancials(actor: Actor, professionalId: string): boolean {
   if (actor.role === "OWNER") return true;
   return actor.professionalId === professionalId;
+}
+
+/** Vê valores em telas que cruzam profissionais (ficha do paciente, menu)? Recepção nunca. */
+export function canViewAnyFinancials(actor: Actor): boolean {
+  return actor.role !== "RECEPTIONIST";
 }
 
 /** Pode excluir (logicamente) um paciente? Recepção não — é decisão do profissional. */

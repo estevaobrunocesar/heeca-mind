@@ -23,13 +23,13 @@ import { canManageMembers } from "@/lib/permissions";
 /** Contexto comum: ator, profissional dono das configurações e fuso da organização. */
 async function ctx() {
   const actor = await requireActor();
-  if (!actor.professionalId) throw new Error("Usuário sem perfil profissional");
-  if (!canEditProfessional(actor, actor.professionalId)) throw new Error("Sem permissão");
+  if (!actor.activeProfessionalId) throw new Error("Usuário sem perfil profissional");
+  if (!canEditProfessional(actor, actor.activeProfessionalId)) throw new Error("Sem permissão");
   const org = await db.organization.findUniqueOrThrow({
     where: { id: actor.organizationId },
     select: { timezone: true },
   });
-  return { actor, professionalId: actor.professionalId, tz: org.timezone };
+  return { actor, professionalId: actor.activeProfessionalId, tz: org.timezone };
 }
 
 // ──────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { STATUS_LABEL } from "@/lib/appointment-status";
 import { db } from "@/lib/db";
+import { canViewFinancials } from "@/lib/permissions";
 import { getActor } from "@/lib/session";
 import { dateTimeInTz, formatDateTimeBR, todayCivilAndMonth } from "@/lib/time";
 import { PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
@@ -11,7 +12,7 @@ import { PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
 export async function GET(req: Request) {
   const actor = await getActor();
   if (!actor) return new Response("Unauthorized", { status: 401 });
-  if (!actor.professionalId && actor.role !== "OWNER") return new Response("Forbidden", { status: 403 });
+  if (!actor.activeProfessionalId || !canViewFinancials(actor, actor.activeProfessionalId)) return new Response("Forbidden", { status: 403 });
 
   const org = await db.organization.findUniqueOrThrow({ where: { id: actor.organizationId }, select: { timezone: true } });
   const tz = org.timezone;
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
 
   const rows = await db.appointment.findMany({
     where: {
-      ...(actor.professionalId ? { professionalId: actor.professionalId } : { organizationId: actor.organizationId }),
+      ...(actor.activeProfessionalId ? { professionalId: actor.activeProfessionalId } : { organizationId: actor.organizationId }),
       startsAt: { gte: start, lt: end },
       status: { in: ["COMPLETED", "CONFIRMED", "AWAITING_PAYMENT", "NO_SHOW"] },
     },

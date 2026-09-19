@@ -30,6 +30,7 @@ model Organization {
   id        String           @id @default(cuid())
   name      String
   type      OrganizationType @default(SOLO)
+  slug      String?          @unique // página pública da clínica: /clinica/<slug>
   timezone  String           @default("America/Sao_Paulo")
   /// Anos de guarda após o último atendimento/exclusão antes de anonimizar (CFP: mínimo 5).
   retentionYears Int          @default(5)
@@ -42,6 +43,7 @@ model Organization {
   appointments  Appointment[]
   notifications Notification[]
   auditLogs     AuditLog[]
+  invitations   Invitation[]
 
   @@map("organizations")
 }
@@ -92,6 +94,24 @@ model Membership {
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@map("memberships")
+}
+
+/// Convite para entrar na organização. O token vai por e-mail; aqui fica só o hash.
+model Invitation {
+  id             String         @id @default(cuid())
+  organizationId String
+  email          String
+  role           MembershipRole
+  tokenHash      String         @unique
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime       @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+  @@map("invitations")
 }
 
 model PasswordResetToken {

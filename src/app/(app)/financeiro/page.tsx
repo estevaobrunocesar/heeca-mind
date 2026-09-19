@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { STATUS_LABEL } from "@/lib/appointment-status";
 import { db } from "@/lib/db";
 import { formatBRL } from "@/lib/money";
+import { canViewFinancials } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { dateTimeInTz, formatDateTimeBR, todayCivilAndMonth } from "@/lib/time";
 import { PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
@@ -27,7 +28,7 @@ const REVENUE_STATUSES = ["COMPLETED", "CONFIRMED", "AWAITING_PAYMENT"] as const
 export default async function FinancePage({ searchParams }: PageProps<"/financeiro">) {
   const sp = await searchParams;
   const actor = await requireActor();
-  if (!actor.professionalId && actor.role !== "OWNER") {
+  if (!actor.activeProfessionalId || !canViewFinancials(actor, actor.activeProfessionalId)) {
     return <EmptyState title="Sem acesso ao financeiro" description="Apenas o profissional ou o responsável pela clínica veem valores." />;
   }
 
@@ -39,7 +40,7 @@ export default async function FinancePage({ searchParams }: PageProps<"/financei
   const start = dateTimeInTz(`${month}-01`, "00:00", tz);
   const end = dateTimeInTz(`${addMonths(month, 1)}-01`, "00:00", tz);
 
-  const proFilter = actor.professionalId ? { professionalId: actor.professionalId } : { organizationId: actor.organizationId };
+  const proFilter = actor.activeProfessionalId ? { professionalId: actor.activeProfessionalId } : { organizationId: actor.organizationId };
 
   const [sessions, receivedInMonth] = await Promise.all([
     db.appointment.findMany({

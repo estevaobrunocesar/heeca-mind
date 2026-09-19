@@ -6,7 +6,7 @@ import { STATUS_LABEL, STATUS_TONE } from "@/lib/appointment-status";
 import { ACTIVE_STATUSES } from "@/lib/availability-data";
 import { db } from "@/lib/db";
 import { formatBRL } from "@/lib/money";
-import { canDeletePatient } from "@/lib/permissions";
+import { canDeletePatient, canViewAnyFinancials } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { formatDateTimeBR } from "@/lib/time";
 import { FOLLOW_UP_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
@@ -80,6 +80,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
   const upcoming = p.appointments.filter((a) => a.startsAt > now && ACTIVE_STATUSES.includes(a.status as (typeof ACTIVE_STATUSES)[number])).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const pendingPayment = p.appointments.filter((a) => a.status === "COMPLETED" && a.paymentStatus === "PENDING").reduce((s, a) => s + a.priceCents, 0);
   const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const showMoney = canViewAnyFinancials(actor);
   const lastAppointmentAt = p.appointments[0]?.startsAt ?? null; // lista ordenada desc
   const due = anonymizationDueAt({ deletedAt: p.deletedAt, lastAppointmentAt, retentionYears: p.organization.retentionYears });
 
@@ -154,7 +155,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
                       <th className="py-2 pr-4">Data</th>
                       <th className="py-2 pr-4">Atendimento</th>
                       <th className="py-2 pr-4">Status</th>
-                      <th className="py-2 pr-4 text-right">Valor</th>
+                      {showMoney && <th className="py-2 pr-4 text-right">Valor</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -174,12 +175,14 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
                         <td className="py-2 pr-4">
                           <span className={`rounded-full px-2 py-0.5 text-xs ${TONE_BADGE[STATUS_TONE[a.status]]}`}>{STATUS_LABEL[a.status]}</span>
                         </td>
+                        {showMoney && (
                         <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums">
                           {formatBRL(a.priceCents)}
                           <span className={`block text-xs ${a.paymentStatus === "PAID" ? "text-success" : a.paymentStatus === "WAIVED" ? "text-text-muted" : a.status === "COMPLETED" ? "text-warning" : "text-text-muted"}`}>
                             {a.paymentStatus === "PAID" ? "pago" : a.paymentStatus === "WAIVED" ? "isento" : "pendente"}
                           </span>
                         </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -208,7 +211,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
               <Row label="Modalidade habitual">{p.usualModality ? MODALITY_LABEL[p.usualModality] : "—"}</Row>
               <Row label="Pagamento">{p.preferredPaymentMethod ? PAYMENT_METHOD_LABEL[p.preferredPaymentMethod] : "—"}</Row>
               <Row label="Recibo">{p.needsReceipt ? "Sim" : "Não"}</Row>
-              {pendingPayment > 0 && (
+              {showMoney && pendingPayment > 0 && (
                 <Row label="Em aberto">
                   <span className="font-medium text-warning">{formatBRL(pendingPayment)}</span>
                 </Row>

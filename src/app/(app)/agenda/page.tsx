@@ -77,7 +77,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   const rangeEnd = dateTimeInTz(addDaysCivil(toISO, 1), "00:00", tz);
 
   // Profissional: o próprio; recepção/dono sem perfil vê toda a organização.
-  const proFilter = actor.professionalId ? { professionalId: actor.professionalId } : { organizationId: actor.organizationId };
+  const proFilter = actor.activeProfessionalId ? { professionalId: actor.activeProfessionalId } : { organizationId: actor.organizationId };
 
   const [appointments, blocks, rules] = await Promise.all([
     db.appointment.findMany({
@@ -95,14 +95,14 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
     }),
     db.scheduleBlock.findMany({
       where: {
-        ...(actor.professionalId ? { professionalId: actor.professionalId } : { professional: { organizationId: actor.organizationId } }),
+        ...(actor.activeProfessionalId ? { professionalId: actor.activeProfessionalId } : { professional: { organizationId: actor.organizationId } }),
         startsAt: { lt: rangeEnd },
         endsAt: { gt: rangeStart },
       },
       select: { startsAt: true, endsAt: true, type: true, reason: true },
     }),
-    actor.professionalId
-      ? db.availabilityRule.findMany({ where: { professionalId: actor.professionalId }, select: { weekday: true, startTime: true, endTime: true } })
+    actor.activeProfessionalId
+      ? db.availabilityRule.findMany({ where: { professionalId: actor.activeProfessionalId }, select: { weekday: true, startTime: true, endTime: true } })
       : Promise.resolve([]),
   ]);
 
@@ -153,7 +153,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
         </div>
       </div>
 
-      {!actor.professionalId && appointments.length === 0 ? (
+      {!actor.activeProfessionalId && appointments.length === 0 ? (
         <EmptyState title="Sem sessões no período" description="Nenhum profissional da organização tem sessões neste intervalo." />
       ) : view === "day" ? (
         <DayView dateISO={date} tz={tz} appointments={appointments} blocks={blocks} rules={rules} todayISO={todayISO} />

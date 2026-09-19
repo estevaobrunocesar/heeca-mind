@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EmptyState } from "@/components/layout/empty-state";
 import { db } from "@/lib/db";
+import { canEditProfessional } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { formatDateTimeBR, WEEKDAY_SHORT } from "@/lib/time";
 import { BlockForm, DeleteButton, ExceptionForm } from "./block-forms";
@@ -24,10 +25,13 @@ function yesterday() {
 
 export default async function BlocksPage() {
   const actor = await requireActor();
-  if (!actor.professionalId) {
+  if (!actor.activeProfessionalId) {
     return <EmptyState title="Nenhum perfil profissional vinculado" description="Sua conta não possui um perfil de psicólogo." />;
   }
-  const professionalId = actor.professionalId;
+  if (!canEditProfessional(actor, actor.activeProfessionalId)) {
+    return <EmptyState title="Sem permissão" description="Recepção não altera perfil, horários ou políticas dos profissionais." />;
+  }
+  const professionalId = actor.activeProfessionalId;
   const since = yesterday();
 
   const [org, blocks, exceptions] = await Promise.all([

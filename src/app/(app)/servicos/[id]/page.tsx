@@ -10,11 +10,11 @@ export const metadata: Metadata = { title: "Editar serviço" };
 export default async function EditServicePage({ params }: PageProps<"/servicos/[id]">) {
   const { id } = await params;
   const actor = await requireActor();
-  if (!actor.professionalId) notFound();
+  if (!actor.activeProfessionalId) notFound();
 
   // Filtro por professionalId garante o isolamento: id de outro tenant -> 404.
   const service = await db.service.findFirst({
-    where: { id, professionalId: actor.professionalId },
+    where: { id, professionalId: actor.activeProfessionalId },
     select: {
       id: true,
       name: true,

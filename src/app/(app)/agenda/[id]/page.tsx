@@ -85,9 +85,11 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
               <Row label="Serviço">{a.serviceNameSnapshot}</Row>
               <Row label="Modalidade">{a.modality === "ONLINE" ? "Online" : "Presencial"}</Row>
               <Row label="Duração">{a.durationMinutes} min</Row>
-              <Row label="Valor">
-                {formatBRL(a.priceCents)} · <span className="text-text-muted">{PAYMENT_LABEL[a.paymentStatus]}</span>
-              </Row>
+              {canViewFinancials(actor, a.professionalId) && (
+                <Row label="Valor">
+                  {formatBRL(a.priceCents)} · <span className="text-text-muted">{PAYMENT_LABEL[a.paymentStatus]}</span>
+                </Row>
+              )}
               <Row label="Origem">
                 {a.source === "PUBLIC_PAGE" ? "Página pública" : a.source === "RECURRING" ? "Recorrência" : "Manual"}
                 {a.series && (

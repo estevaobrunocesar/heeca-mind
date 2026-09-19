@@ -13,8 +13,9 @@ export const NAV = [
   { href: "/configuracoes", label: "Configurações" },
 ] as const;
 
-export function Sidebar({ userName, publicUrl }: { userName: string; publicUrl: string | null }) {
+export function Sidebar({ userName, publicUrl, orgName, hideFinance = false }: { userName: string; publicUrl: string | null; orgName: string | null; hideFinance?: boolean }) {
   const pathname = usePathname();
+  const items = NAV.filter((i) => !(hideFinance && i.href === "/financeiro"));
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex">
       <div className="flex items-center gap-2 px-5 py-5">
@@ -23,8 +24,9 @@ export function Sidebar({ userName, publicUrl }: { userName: string; publicUrl: 
         </div>
         <span className="font-semibold tracking-tight">Hecca Psico</span>
       </div>
+      {orgName && <p className="-mt-3 truncate px-5 pb-3 text-xs text-text-muted">{orgName}</p>}
       <nav className="flex-1 space-y-1 px-3">
-        {NAV.map((item) => {
+        {items.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link

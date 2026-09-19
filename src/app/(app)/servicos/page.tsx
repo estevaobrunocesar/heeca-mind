@@ -13,7 +13,7 @@ const MODALITY_LABEL = { IN_PERSON: "Presencial", ONLINE: "Online", HYBRID: "Pre
 
 export default async function ServicesPage() {
   const actor = await requireActor();
-  if (!actor.professionalId) {
+  if (!actor.activeProfessionalId) {
     return (
       <>
         <PageHeader title="Serviços" />
@@ -26,7 +26,7 @@ export default async function ServicesPage() {
   }
 
   const services = await db.service.findMany({
-    where: { professionalId: actor.professionalId },
+    where: { professionalId: actor.activeProfessionalId },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
 

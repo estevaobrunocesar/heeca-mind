@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation";
 import { NAV } from "./sidebar";
 
 /** Barra de navegação horizontal para telas < md; a sidebar cuida do resto. */
-export function MobileNav() {
+export function MobileNav({ hideFinance = false }: { hideFinance?: boolean }) {
   const pathname = usePathname();
+  const items = NAV.filter((i) => !(hideFinance && i.href === "/financeiro"));
   return (
     <nav className="flex gap-1 overflow-x-auto border-b border-border bg-surface px-2 py-1 md:hidden" aria-label="Navegação">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.href || pathname.startsWith(item.href + "/");
         return (
           <Link

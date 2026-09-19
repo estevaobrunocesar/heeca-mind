@@ -11,14 +11,14 @@ export const metadata: Metadata = { title: "Nova sessão" };
 export default async function NewAppointmentPage({ searchParams }: PageProps<"/agenda/novo">) {
   const sp = await searchParams;
   const actor = await requireActor();
-  if (!actor.professionalId) {
+  if (!actor.activeProfessionalId) {
     return <EmptyState title="Nenhum perfil profissional vinculado" description="Apenas profissionais podem criar sessões por aqui." />;
   }
 
   const [org, services, patients] = await Promise.all([
     db.organization.findUniqueOrThrow({ where: { id: actor.organizationId }, select: { timezone: true } }),
     db.service.findMany({
-      where: { professionalId: actor.professionalId, isActive: true },
+      where: { professionalId: actor.activeProfessionalId, isActive: true },
       orderBy: { sortOrder: "asc" },
       select: { id: true, name: true, modality: true, durationMinutes: true },
     }),

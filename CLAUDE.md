@@ -25,7 +25,7 @@ npm run typecheck
 ## Convenções que não se derivam do código
 
 - **Tenant sempre explícito.** Toda query em entidade com `organizationId` filtra por `actor.organizationId`. Use os helpers de `src/lib/tenant.ts`. Nunca confie em id vindo do cliente sem verificar o tenant.
-- **Ator via `requireActor()`** (`src/lib/session.ts`) em Server Components/Actions. Autorização em `src/lib/permissions.ts` — funções puras, sem banco.
+- **Ator via `requireActor()`** (`src/lib/session.ts`) em Server Components/Actions. Autorização em `src/lib/permissions.ts` — funções puras, sem banco. `actor.professionalId` = "quem eu sou"; `actor.activeProfessionalId` = "de quem estou cuidando" (seletor do cabeçalho para dono/recepção). Telas usam o ativo; permissões comparam com o próprio.
 - **Administrativo ≠ clínico.** `Patient.adminNotes` e `Appointment.adminNote` são operacionais. Conteúdo terapêutico só em `ClinicalNote.contentEnc`, cifrado por `src/lib/crypto.ts`, acesso via `canAccessClinicalData` + `ClinicalAccessLog`.
 - **WhatsApp só por template.** `src/lib/whatsapp/templates.ts` é a lista fechada de variáveis. Nenhum campo livre do banco entra numa mensagem.
 - **Página pública usa `select` exaustivo** (`src/app/agendar/[slug]/page.tsx`). Nunca `include` ou objeto inteiro em rota sem auth.
@@ -141,3 +141,12 @@ prisma/                schema, migrations, seed
 - Revogação automática: redefinir senha revoga todas; ativar MFA revoga as outras. Manual em `/configuracoes/seguranca` (uma ou "sair dos outros dispositivos"). Auditoria `auth.session_revoke*`.
 - `lastSeenAt` é atualizado no máximo a cada 5 min (melhor esforço). Cron apaga expiradas/revogadas com >30 dias.
 - Após um deploy que introduza esta tabela, JWTs antigos (sem linha) exigem novo login uma vez.
+
+## Clínicas (multi-profissional)
+
+- Papéis: OWNER (tudo), PROFESSIONAL (só o próprio perfil/agenda/valores), RECEPTIONIST (agenda e pacientes de qualquer profissional; nunca valores, configurações ou equipe). `canViewAnyFinancials` esconde valores da recepção em telas cruzadas (menu, ficha do paciente).
+- Seletor de profissional: cookie `hp_pro` (`setActiveProfessionalAction`), validado no tenant a cada requisição em `resolveActiveProfessional`. PROFESSIONAL ignora o cookie.
+- Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com CRP/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.
+- Página pública da clínica: `/clinica/[slug]` (Organization.slug) lista profissionais ativos → `/agendar/[slug]`.
+- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica`.
+- Migrações com aviso interativo (índice único): `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` para a pasta e `prisma migrate deploy`.

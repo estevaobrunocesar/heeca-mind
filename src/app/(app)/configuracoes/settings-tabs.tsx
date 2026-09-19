@@ -9,6 +9,7 @@ const TABS = [
   { href: "/configuracoes/bloqueios", label: "Bloqueios" },
   { href: "/configuracoes/politicas", label: "Políticas" },
   { href: "/configuracoes/seguranca", label: "Segurança" },
+  { href: "/configuracoes/equipe", label: "Equipe" },
 ] as const;
 
 export function SettingsTabs() {

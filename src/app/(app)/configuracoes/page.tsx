@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EmptyState } from "@/components/layout/empty-state";
 import { db } from "@/lib/db";
+import { canEditProfessional } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { PhotoUploader } from "./photo-uploader";
 import { ProfileForm } from "./profile-form";
@@ -9,12 +10,15 @@ export const metadata: Metadata = { title: "Perfil" };
 
 export default async function ProfileSettingsPage() {
   const actor = await requireActor();
-  if (!actor.professionalId) {
+  if (!actor.activeProfessionalId) {
     return <EmptyState title="Nenhum perfil profissional vinculado" description="Sua conta não possui um perfil de psicólogo." />;
+  }
+  if (!canEditProfessional(actor, actor.activeProfessionalId)) {
+    return <EmptyState title="Sem permissão" description="Recepção não altera perfil, horários ou políticas dos profissionais." />;
   }
 
   const profile = await db.professional.findUniqueOrThrow({
-    where: { id: actor.professionalId },
+    where: { id: actor.activeProfessionalId },
     select: {
       displayName: true,
       fullName: true,

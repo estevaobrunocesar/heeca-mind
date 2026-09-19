@@ -22,7 +22,7 @@ export async function verifyMfaAction(_prev: FormState, formData: FormData): Pro
     return { error: r.error };
   }
 
-  await audit({ userId: u.id, organizationId: u.organizationId, role: u.role, professionalId: u.professionalId }, {
+  await audit({ userId: u.id, organizationId: u.organizationId, role: u.role, professionalId: u.professionalId, activeProfessionalId: null }, {
     organizationId: u.organizationId,
     action: r.usedRecovery ? "auth.mfa_recovery" : "auth.mfa",
     entityType: "User",

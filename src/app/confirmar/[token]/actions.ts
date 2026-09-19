@@ -4,11 +4,20 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleReminder } from "@/lib/notifications";
+import { clientIp, rateLimit, retryMessage, RULES } from "@/lib/rate-limit";
 
 /**
  * Ações do paciente via link do WhatsApp. O token é a credencial: 24 bytes
  * aleatórios, único por sessão. Sem login.
  */
+
+/** Barra varredura de tokens por IP. */
+async function guard(): Promise<string | null> {
+  const ip = await clientIp();
+  if (!ip) return null;
+  const r = await rateLimit(RULES.tokenActionIp, ip);
+  return r.ok ? null : retryMessage(r.retryAfterSeconds);
+}
 
 async function byToken(token: string) {
   return db.appointment.findUnique({
@@ -24,6 +33,8 @@ async function byToken(token: string) {
 }
 
 export async function confirmByTokenAction(token: string): Promise<{ ok: boolean; message: string }> {
+  const limited = await guard();
+  if (limited) return { ok: false, message: limited };
   const a = await byToken(token);
   if (!a) return { ok: false, message: "Link inválido." };
   if (a.status === "CONFIRMED") return { ok: true, message: "Este horário já está confirmado." };
@@ -41,6 +52,8 @@ export async function confirmByTokenAction(token: string): Promise<{ ok: boolean
 }
 
 export async function cancelByTokenAction(token: string): Promise<{ ok: boolean; message: string }> {
+  const limited = await guard();
+  if (limited) return { ok: false, message: limited };
   const a = await byToken(token);
   if (!a) return { ok: false, message: "Link inválido." };
   if (a.status === "CANCELLED_BY_PATIENT") return { ok: true, message: "Este agendamento já foi cancelado." };

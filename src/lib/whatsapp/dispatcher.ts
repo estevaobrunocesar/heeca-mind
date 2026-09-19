@@ -5,6 +5,7 @@ import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleRemi
 import { getWhatsAppProvider } from "./meta";
 import type { WhatsAppProvider } from "./provider";
 import { parseReply, replyTextFrom } from "./replies";
+import { purgeRateLimits } from "@/lib/rate-limit";
 
 /**
  * Rotinas periódicas do WhatsApp. Chamadas pelo cron (src/app/api/cron) a
@@ -249,5 +250,6 @@ export async function runCron() {
   const webhook = await processWebhookEvents();
   const expiry = await expirePendingBookings();
   const dispatch = await dispatchQueued();
-  return { webhook, expiry, dispatch, at: new Date().toISOString() };
+  const purgedRateLimits = await purgeRateLimits();
+  return { webhook, expiry, dispatch, purgedRateLimits, at: new Date().toISOString() };
 }

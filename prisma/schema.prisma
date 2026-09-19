@@ -612,6 +612,21 @@ model ClinicalAccessLog {
 }
 
 // ───────────────────────────────────────────────────────────────
+// RATE LIMIT
+// ───────────────────────────────────────────────────────────────
+
+/// Contador de janela fixa. `key` é um hash (sha256) de escopo + identificador
+/// (IP, telefone) — nunca o dado em claro. Ver src/lib/rate-limit.ts.
+model RateLimit {
+  key         String   @id
+  windowStart DateTime
+  count       Int
+
+  @@index([windowStart])
+  @@map("rate_limits")
+}
+
+// ───────────────────────────────────────────────────────────────
 // AUDITORIA
 // ───────────────────────────────────────────────────────────────
 

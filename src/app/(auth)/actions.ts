@@ -8,6 +8,7 @@ import { signIn } from "@/auth";
 import { db } from "@/lib/db";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { formValues, invalid, type FormState } from "@/lib/form";
+import { clientIp, rateLimitAll, retryMessage, RULES } from "@/lib/rate-limit";
 import { slugify } from "@/lib/slug";
 import {
   loginSchema,
@@ -87,6 +88,13 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error, formData);
 
+  // Força bruta: limite por IP (largo) e por e-mail (estreito).
+  const limited = await rateLimitAll([
+    { rule: RULES.loginIp, identifier: await clientIp() },
+    { rule: RULES.loginEmail, identifier: parsed.data.email },
+  ]);
+  if (!limited.ok) return { error: retryMessage(limited.retryAfterSeconds), values: { email: parsed.data.email } };
+
   try {
     await signIn("credentials", { ...parsed.data, redirectTo: "/dashboard" });
     return { ok: true };
@@ -115,6 +123,9 @@ export async function requestPasswordResetAction(
   const parsed = requestResetSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error, formData);
   const { email } = parsed.data;
+
+  const limited = await rateLimitAll([{ rule: RULES.passwordResetIp, identifier: await clientIp() }]);
+  if (!limited.ok) return { error: retryMessage(limited.retryAfterSeconds), values: { email } };
 
   const user = await db.user.findUnique({ where: { email }, select: { id: true } });
 

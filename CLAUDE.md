@@ -88,7 +88,7 @@ prisma/                schema, migrations, seed
 - A página "solicitado" NÃO exibe o token; confirmar só pelo link do WhatsApp (`/confirmar/[token]`) comprova a posse do número.
 - Paciente é reaproveitado por (organizationId, whatsapp); nome existente não é sobrescrito por formulário anônimo.
 - Rotas públicas (`agendar`, `confirmar`, `sessao`) ficam fora do matcher do proxy — ver `src/proxy.ts`.
-- Pendente: rate limit no formulário público (há honeypot `website`, mas não há limite por IP).
+- Rate limit em `src/lib/rate-limit.ts` (janela fixa no Postgres, chaves sha256): público por IP/telefone/profissional + teto de 2 pendentes por número; ações por token; login por IP e e-mail; reset por IP. Sem header de proxy, anônimos caem no balde "unknown". Limpeza no cron.
 
 ## WhatsApp (ver docs/WHATSAPP.md)
 

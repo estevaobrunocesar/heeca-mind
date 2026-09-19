@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { formValues, invalid, type FormState } from "@/lib/form";
 import { enqueueAppointmentNotification } from "@/lib/notifications";
+import { clientIp, MAX_PENDING_BOOKINGS_PER_PHONE, rateLimitAll, retryMessage, RULES } from "@/lib/rate-limit";
 import { dateTimeInTz } from "@/lib/time";
 import { publicBookingSchema } from "@/lib/validation/booking";
 
@@ -15,6 +16,8 @@ import { publicBookingSchema } from "@/lib/validation/booking";
  * Solicitação de agendamento pela página pública.
  *
  * Proteções:
+ *  - Rate limit por IP, por telefone e por profissional (src/lib/rate-limit.ts),
+ *    mais um teto de solicitações pendentes por número.
  *  - O slot é recalculado no servidor (grade, buffer, antecedência) — o
  *    cliente só sugere.
  *  - Lock consultivo por profissional dentro da transação: duas pessoas
@@ -27,6 +30,12 @@ export async function createPublicBookingAction(
   formData: FormData,
 ): Promise<FormState & { slug: string }> {
   const { slug } = prev;
+  const ip = await clientIp();
+
+  // Limite por IP antes de qualquer validação: barra flood mesmo com dados inválidos.
+  const ipCheck = await rateLimitAll([{ rule: RULES.publicBookingIp, identifier: ip }]);
+  if (!ipCheck.ok) return { slug, error: retryMessage(ipCheck.retryAfterSeconds), values: formValues(formData) };
+
   const parsed = publicBookingSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { slug, ...invalid(parsed.error, formData) };
   const d = parsed.data;
@@ -44,6 +53,25 @@ export async function createPublicBookingAction(
   if (!professional || !service) return { slug, error: "Este atendimento não está mais disponível." };
   if (service.modality !== "HYBRID" && service.modality !== d.modality) {
     return { slug, error: "Modalidade indisponível para este atendimento.", values: formValues(formData) };
+  }
+
+  // Limites por telefone e por profissional só depois de validar (chaves confiáveis).
+  const scoped = await rateLimitAll([
+    { rule: RULES.publicBookingPhone, identifier: d.whatsapp },
+    { rule: RULES.publicBookingProfessional, identifier: professional.id },
+  ]);
+  if (!scoped.ok) return { slug, error: retryMessage(scoped.retryAfterSeconds), values: formValues(formData) };
+
+  // Teto de pendentes: a mesma pessoa não reserva vários horários sem confirmar nenhum.
+  const pendingForPhone = await db.appointment.count({
+    where: { patient: { organizationId: professional.organizationId, whatsapp: d.whatsapp! }, status: "AWAITING_CONFIRMATION", startsAt: { gt: new Date() } },
+  });
+  if (pendingForPhone >= MAX_PENDING_BOOKINGS_PER_PHONE) {
+    return {
+      slug,
+      error: "Você já tem solicitações aguardando confirmação. Confirme-as pelo WhatsApp antes de pedir outro horário.",
+      values: formValues(formData),
+    };
   }
 
   const tz = professional.organization.timezone;

@@ -243,7 +243,9 @@ export async function startAppointmentAction(appointmentId: string) {
 }
 
 export async function completeAppointmentAction(appointmentId: string) {
-  await transition(appointmentId, "complete", { completedAt: new Date() });
+  const { after } = await transition(appointmentId, "complete", { completedAt: new Date() });
+  // Base da reativação (§28): a última sessão concluída fica na ficha, sem varrer a agenda.
+  await db.patient.updateMany({ where: { id: after.patientId, OR: [{ lastCompletedAt: null }, { lastCompletedAt: { lt: after.startsAt } }] }, data: { lastCompletedAt: after.startsAt } });
 }
 
 export async function noShowAppointmentAction(appointmentId: string) {

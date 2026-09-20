@@ -1,8 +1,8 @@
 import "server-only";
-import type { NotificationType } from "@/generated/prisma/enums";
 import { db } from "./db";
 import { formatDateBR, slotLabelInTz } from "./time";
 import { buildButtons, buildVariables, TEMPLATES, type WhatsAppNotificationType, type WhatsAppPayload } from "./whatsapp/templates";
+import { parseCommsPrefs, reminderAllowed } from "./comms-prefs";
 
 /**
  * Enfileira notificações de WhatsApp para um agendamento.
@@ -118,14 +118,16 @@ export async function cancelQueuedNotifications(appointmentId: string) {
  * Idempotente: não duplica se já houver uma QUEUED do mesmo tipo.
  */
 export async function scheduleReminder(appointmentId: string, startsAt: Date) {
-  const a = await db.appointment.findUniqueOrThrow({ where: { id: appointmentId }, select: { modality: true } });
-  const plan: Array<{ type: WhatsAppNotificationType; at: Date }> = [
+  const a = await db.appointment.findUniqueOrThrow({ where: { id: appointmentId }, select: { modality: true, patient: { select: { commsPrefs: true } } } });
+  const prefs = parseCommsPrefs(a.patient.commsPrefs);
+  const plan: Array<{ type: "REMINDER_24H" | "REMINDER_2H" | "SESSION_LINK"; at: Date }> = [
     { type: "REMINDER_24H", at: new Date(startsAt.getTime() - 24 * 60 * 60 * 1000) },
   ];
   if (a.modality === "ONLINE") plan.push({ type: "SESSION_LINK", at: new Date(startsAt.getTime() - 2 * 60 * 60 * 1000) });
 
   for (const { type, at } of plan) {
     if (at <= new Date()) continue;
+    if (!reminderAllowed(prefs, type)) continue; // preferência do paciente (§12)
     const exists = await db.notification.findFirst({ where: { appointmentId, type, status: "QUEUED" }, select: { id: true } });
     if (exists) continue;
     await enqueueAppointmentNotification(appointmentId, type, { scheduledFor: at });

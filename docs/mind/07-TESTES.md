@@ -57,6 +57,7 @@ Mais dois **negativos** obrigatórios: recepção tenta abrir prontuário (404);
 
 | Momento | Comando |
 |---|---|
-| a cada commit | `npm run typecheck && npm test` |
+| a cada commit | `npm run typecheck && npm test && npx eslint src` |
+| a cada PR | `npm run build` — o `tsc` não detecta módulo cliente importando Prisma (Turbopack sim) |
 | antes de abrir PR | `npm run check:lgpd && npm run check:heeca && npm run check:notify && npm run check:packages` |
 | release | E2E + checklist de segurança §4 + restore de backup e leitura de nota cifrada |

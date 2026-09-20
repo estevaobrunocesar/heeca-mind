@@ -11,6 +11,7 @@ import { canOpenClinicalRecord } from "@/lib/clinical";
 import { requireActor } from "@/lib/session";
 import { formatDateTimeBR } from "@/lib/time";
 import { FOLLOW_UP_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
+import { describeCommsPrefs, parseCommsPrefs } from "@/lib/comms-prefs";
 import { PatientDangerZone } from "./danger-zone";
 import { anonymizationDueAt } from "@/lib/lgpd/retention";
 import { formatDateBR } from "@/lib/time";
@@ -71,12 +72,15 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
         },
       },
       recurringSeries: { where: { isActive: true }, select: { id: true, frequency: true, weekday: true, startTime: true } },
+      tags: { select: { tag: { select: { id: true, name: true } } }, orderBy: { tag: { name: "asc" } } },
     },
   });
   if (!p) notFound();
+  const address = [p.addressLine, [p.addressCity, p.addressState].filter(Boolean).join("/"), p.addressZip ? p.addressZip.replace(/^(\d{5})(\d{3})$/, "$1-$2") : null].filter(Boolean).join(" · ");
 
   const tz = p.organization.timezone;
   const now = new Date();
+  const age = p.birthDate ? Math.floor((now.getTime() - p.birthDate.getTime()) / (365.25 * 86_400_000)) : null;
   const completed = p.appointments.filter((a) => a.status === "COMPLETED").length;
   const noShow = p.appointments.filter((a) => a.status === "NO_SHOW").length;
   const cancelled = p.appointments.filter((a) => a.status.startsWith("CANCELLED")).length;
@@ -208,9 +212,25 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
             <h2 className="mb-2 text-base font-semibold">Contato</h2>
             <dl className="divide-y divide-border">
               <Row label="WhatsApp">{p.whatsapp}</Row>
+              {p.phone && <Row label="Telefone">{p.phone}</Row>}
               {p.email && <Row label="E-mail">{p.email}</Row>}
+              {p.birthDate && <Row label="Nascimento">{formatDateBR(p.birthDate, "UTC")}{age !== null && ` · ${age} anos`}</Row>}
+              {address && <Row label="Endereço">{address}</Row>}
               {p.bestContactTime && <Row label="Melhor horário">{p.bestContactTime}</Row>}
+              {(p.emergencyContactName || p.emergencyContactPhone) && (
+                <Row label="Emergência">{[p.emergencyContactName, p.emergencyContactPhone].filter(Boolean).join(" · ")}</Row>
+              )}
+              <Row label="Comunicação">{describeCommsPrefs(parseCommsPrefs(p.commsPrefs))}</Row>
             </dl>
+            {p.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {p.tags.map(({ tag }) => (
+                  <Link key={tag.id} href={`/pacientes?tag=${encodeURIComponent(tag.name)}`} className="rounded-md bg-primary-soft px-2 py-0.5 text-xs text-primary hover:underline">
+                    {tag.name}
+                  </Link>
+                ))}
+              </div>
+            )}
             {!p.anonymizedAt && <a href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn-ghost mt-3 w-full">
               Abrir WhatsApp ↗
             </a>}

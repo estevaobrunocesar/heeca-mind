@@ -28,6 +28,7 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pacient
   const actor = await requireActor();
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const status = parseStatus(sp.status);
+  const tag = typeof sp.tag === "string" ? sp.tag.trim().slice(0, 40) : "";
   const deletedNotice = sp.deleted === "1";
 
   const org = await db.organization.findUniqueOrThrow({ where: { id: actor.organizationId }, select: { timezone: true } });
@@ -38,6 +39,7 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pacient
       organizationId: actor.organizationId,
       deletedAt: status === "DELETED" ? { not: null } : null,
       ...(status && status !== "DELETED" ? { followUpStatus: status } : {}),
+      ...(tag ? { tags: { some: { tag: { organizationId: actor.organizationId, name: tag } } } } : {}),
       ...(q
         ? {
             OR: [
@@ -75,7 +77,14 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pacient
       {label}
     </Link>
   );
-  const link = (s?: string) => `/pacientes${s ? `?status=${s}` : ""}${q ? `${s ? "&" : "?"}q=${encodeURIComponent(q)}` : ""}`;
+  const link = (s?: string) => {
+    const params = new URLSearchParams();
+    if (s) params.set("status", s);
+    if (q) params.set("q", q);
+    if (tag) params.set("tag", tag);
+    const qs = params.toString();
+    return `/pacientes${qs ? `?${qs}` : ""}`;
+  };
 
   return (
     <>
@@ -89,6 +98,15 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pacient
         }
       />
 
+      {tag && (
+        <div role="status" className="mb-4 flex items-center gap-2 text-sm">
+          <span className="text-text-muted">Etiqueta:</span>
+          <span className="rounded-md bg-primary-soft px-2 py-0.5 text-primary">{tag}</span>
+          <Link href={status ? `/pacientes?status=${status}` : "/pacientes"} className="text-primary hover:underline">
+            limpar
+          </Link>
+        </div>
+      )}
       {deletedNotice && (
         <div role="status" className="mb-4 rounded-lg border border-border bg-surface-muted px-3 py-2 text-sm">
           Paciente excluído. O histórico fica preservado pelo prazo de retenção; você pode restaurá-lo no filtro “Excluídos”.
@@ -98,6 +116,7 @@ export default async function PatientsPage({ searchParams }: PageProps<"/pacient
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <form className="flex gap-2" action="/pacientes" method="get">
           {status && <input type="hidden" name="status" value={status} />}
+          {tag && <input type="hidden" name="tag" value={tag} />}
           <input name="q" defaultValue={q} placeholder="Buscar por nome, WhatsApp ou e-mail" className="input w-72" />
           <button type="submit" className="btn-ghost">
             Buscar

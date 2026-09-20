@@ -54,7 +54,7 @@ prisma/                schema, migrations, seed
 | 2 Configuração do consultório | ✅ perfil, grade semanal, regras, bloqueios/exceções, políticas |
 | 3 Serviços | ✅ CRUD, ordenação, ativar/desativar, exclusão protegida |
 | 4 Agenda | ✅ dia/semana/mês, criação manual + recorrência, transições de status, reagendar, cancelar série |
-| 5 Pacientes | ✅ listagem com busca/filtros, ficha com histórico e indicadores, criar/editar, exclusão lógica LGPD + restauração |
+| 5 Pacientes | ✅ listagem com busca/filtros/etiquetas, ficha administrativa completa (§12), criar/editar, exclusão lógica LGPD + restauração |
 | 6 Agendamento público | ✅ modalidade → mês → dia → horário → dados + LGPD; confirmação/cancelamento por token |
 | 7 WhatsApp | ✅ dispatcher com retry, webhook (status + respostas), expiração de pendentes, link de sessão, painel /mensagens — falta só credenciais reais da Meta |
 | 8 Dashboard | ✅ sessões do dia, próxima, pacientes ativos, confirmadas, pendentes, cancelamentos, reagendamentos, online/presencial, faturamento, comparecimento |
@@ -65,6 +65,14 @@ prisma/                schema, migrations, seed
 - `Organization.segment` (`PSYCHOLOGY` | `THERAPY`, default PSYCHOLOGY) decide o tipo de registro padrão. O MVP só exibe Psicologia; não criar telas de segmento agora.
 - `Professional.registrationKind` (`CRP` | `CRN` | `CRFa` | `NONE`) + `registrationNumber` (nulo = perfil provisionado pelo portal e ainda não preenchido) substituem o antigo `crp`. Regras puras em `src/lib/registration.ts` (testado); formulários usam `registrationField(kind)` de `src/lib/validation/registration.ts`. **Nunca** formatar "CRP …" à mão: telas chamam `formatRegistration(p)` (respeita `showRegistration`) e documentos oficiais `formatRegistration(p, { force: true })`.
 - Convite de equipe herda o tipo de registro do segmento da organização (`DEFAULT_REGISTRATION_BY_SEGMENT`).
+
+## CRM e clínica (Mind, etapa 2)
+
+- Papéis: OWNER, PROFESSIONAL, RECEPTIONIST, **FINANCE** (valores de todos, agenda e pacientes só leitura, nunca clínico). Criar/editar paciente exige `canManagePatients`; recepção continua podendo.
+- Ficha do paciente (§12): `phone`, `birthDate` (`@db.Date`, ler/gravar em UTC), endereço, contato de emergência, `commsPrefs` (`src/lib/comms-prefs.ts`, puro; null = tudo ligado; só afeta lembretes — `scheduleReminder` respeita), `lastCompletedAt` (gravado em `completeAppointmentAction`; base da reativação) e **tags** (`Tag` por organização, upsert por nome em `syncPatientTags`; `/pacientes?tag=`). Tudo administrativo: entra na exportação do titular e na anonimização.
+- Cadastro da clínica (§6) em `/configuracoes/clinica` (só OWNER): `organizationSchema`; CPF/CNPJ validado por dígito verificador em `src/lib/br-document.ts` (puro), guardado só dígitos. O bloco nome/slug saiu da aba Equipe.
+- `AppointmentStatus.IN_PROGRESS` ("Em atendimento"): ação `start`; em atendimento só conclui.
+- **Fronteira cliente/servidor**: `src/lib/validation/*`, `comms-prefs`, `registration`, `br-document` são importados por componentes cliente — nunca importar `@/generated/prisma/client` (runtime) neles; `Prisma.JsonNull` fica nas actions. O `tsc` não pega isso; só o `next build`/Turbopack.
 
 ## Padrões de formulário
 

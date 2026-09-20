@@ -61,6 +61,19 @@ model Organization {
   document            String? // CPF/CNPJ só dígitos
   contactEmail        String?
   contactPhone        String?
+  // Cadastro da clínica (§6) — o que aparece em documentos, página pública e mensagens
+  legalName           String?
+  whatsapp            String? // E.164
+  website             String?
+  instagram           String?
+  logoUrl             String?
+  logoKey             String?
+  addressLine         String?
+  addressCity         String?
+  addressState        String?
+  addressZip          String?
+  offersOnline        Boolean     @default(true)
+  offersInPerson      Boolean     @default(true)
   /// Anos de guarda após o último atendimento/exclusão antes de anonimizar (CFP: mínimo 5).
   retentionYears Int              @default(5)
   createdAt      DateTime         @default(now())
@@ -69,6 +82,7 @@ model Organization {
   memberships         Membership[]
   professionals       Professional[]
   patients            Patient[]
+  tags                Tag[]
   appointments        Appointment[]
   notifications       Notification[]
   auditLogs           AuditLog[]
@@ -429,6 +443,21 @@ model Patient {
   name     String
   whatsapp String // E.164
   email    String?
+  phone    String? // telefone alternativo (fixo, recado)
+  birthDate DateTime? @db.Date
+
+  // Endereço e contato de emergência: administrativos (para recibo e para ligar), nunca clínicos
+  addressLine           String?
+  addressCity           String?
+  addressState          String?
+  addressZip            String?
+  emergencyContactName  String?
+  emergencyContactPhone String? // E.164
+
+  /// Preferências de comunicação (src/lib/comms-prefs.ts): { whatsapp, reminder24h, reminder2h }. null = tudo ligado.
+  commsPrefs Json?
+  /// Última sessão concluída — desnormalizado por transition(complete); base da reativação (§28).
+  lastCompletedAt DateTime?
 
   usualModality          Modality?
   followUpStatus         FollowUpStatus @default(ACTIVE)
@@ -454,15 +483,45 @@ model Patient {
   formRequests        FormRequest[]
   notifications       Notification[]
   receipts            Receipt[]
+  tags                PatientTag[]
 
   @@unique([organizationId, whatsapp])
   @@index([organizationId, name])
+  @@index([organizationId, followUpStatus])
+  @@index([organizationId, lastCompletedAt])
   @@map("patients")
 }
 
 // ───────────────────────────────────────────────────────────────
 // AGENDAMENTOS
 // ───────────────────────────────────────────────────────────────
+
+/// Etiquetas administrativas do CRM ("convênio X", "indicação", "prefere manhã"). Nunca clínicas.
+model Tag {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patients     PatientTag[]
+
+  @@unique([organizationId, name])
+  @@map("tags")
+}
+
+model PatientTag {
+  patientId String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([patientId, tagId])
+  @@index([tagId])
+  @@map("patient_tags")
+}
 
 enum AppointmentStatus {
   PENDING // solicitado, aguardando ação

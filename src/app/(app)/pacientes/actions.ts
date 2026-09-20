@@ -9,8 +9,23 @@ import { formValues, invalid, type FormState } from "@/lib/form";
 import { canDeletePatient, canManagePatients } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { assertPatientInTenant } from "@/lib/tenant";
-import { patientSchema } from "@/lib/validation/patient";
+import { patientSchema, splitPatientInput } from "@/lib/validation/patient";
 import { anonymizePatient } from "@/lib/lgpd/anonymize";
+import { Prisma } from "@/generated/prisma/client";
+
+/**
+ * Tags são administrativas e por organização: upsert por nome, e o vínculo do paciente vira
+ * exatamente a lista enviada (remove as que saíram). Tags órfãs ficam — servem de sugestão.
+ */
+async function syncPatientTags(tx: Prisma.TransactionClient, organizationId: string, patientId: string, names: string[]) {
+  const ids: string[] = [];
+  for (const name of names) {
+    const t = await tx.tag.upsert({ where: { organizationId_name: { organizationId, name } }, update: {}, create: { organizationId, name }, select: { id: true } });
+    ids.push(t.id);
+  }
+  await tx.patientTag.deleteMany({ where: { patientId, tagId: { notIn: ids } } });
+  await tx.patientTag.createMany({ data: ids.map((tagId) => ({ patientId, tagId })), skipDuplicates: true });
+}
 
 /** WhatsApp é único por organização — evita dois cadastros da mesma pessoa. */
 async function whatsappTaken(organizationId: string, whatsapp: string, exceptId?: string) {
@@ -35,10 +50,13 @@ export async function createPatientAction(_prev: FormState, formData: FormData):
     };
   }
 
-  const patient = await db.patient.create({
-    data: { organizationId: actor.organizationId, ...d, whatsapp: d.whatsapp! },
+  const { columns, commsPrefs, tags } = splitPatientInput(d);
+  const patient = await db.$transaction(async (tx) => {
+    const p = await tx.patient.create({ data: { organizationId: actor.organizationId, ...columns, whatsapp: columns.whatsapp!, commsPrefs: commsPrefs ?? Prisma.JsonNull } });
+    await syncPatientTags(tx, actor.organizationId, p.id, tags);
+    return p;
   });
-  await audit(actor, { organizationId: actor.organizationId, action: "patient.create", entityType: "Patient", entityId: patient.id, after: patient });
+  await audit(actor, { organizationId: actor.organizationId, action: "patient.create", entityType: "Patient", entityId: patient.id, after: { ...patient, tags } });
 
   revalidatePath("/pacientes");
   redirect(`/pacientes/${patient.id}`);
@@ -55,9 +73,14 @@ export async function updatePatientAction(patientId: string, _prev: FormState, f
   const dup = await whatsappTaken(actor.organizationId, d.whatsapp!, patientId);
   if (dup) return { fieldErrors: { whatsapp: [`Este número já é de ${dup.name}.`] }, values: formValues(formData) };
 
+  const { columns, commsPrefs, tags } = splitPatientInput(d);
   const before = await db.patient.findUniqueOrThrow({ where: { id: patientId } });
-  const after = await db.patient.update({ where: { id: patientId }, data: { ...d, whatsapp: d.whatsapp! } });
-  await audit(actor, { organizationId: actor.organizationId, action: "patient.update", entityType: "Patient", entityId: patientId, before, after });
+  const after = await db.$transaction(async (tx) => {
+    const p = await tx.patient.update({ where: { id: patientId }, data: { ...columns, whatsapp: columns.whatsapp!, commsPrefs: commsPrefs ?? Prisma.JsonNull } });
+    await syncPatientTags(tx, actor.organizationId, patientId, tags);
+    return p;
+  });
+  await audit(actor, { organizationId: actor.organizationId, action: "patient.update", entityType: "Patient", entityId: patientId, before, after: { ...after, tags } });
 
   revalidatePath("/pacientes");
   revalidatePath(`/pacientes/${patientId}`);

@@ -9,6 +9,7 @@ const TABS = [
   { href: "/configuracoes/bloqueios", label: "Bloqueios" },
   { href: "/configuracoes/politicas", label: "Políticas" },
   { href: "/configuracoes/seguranca", label: "Segurança" },
+  { href: "/configuracoes/clinica", label: "Clínica" },
   { href: "/configuracoes/equipe", label: "Equipe" },
   { href: "/configuracoes/delegacoes", label: "Delegações" },
   { href: "/configuracoes/formularios", label: "Formulários" },

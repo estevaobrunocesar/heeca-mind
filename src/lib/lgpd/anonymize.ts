@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@/generated/prisma/client";
 import { audit } from "@/lib/audit";
 import { purgeDocumentBlobs } from "@/lib/clinical";
 import { db } from "@/lib/db";
@@ -35,6 +36,15 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
         name: "Paciente anonimizado",
         whatsapp: `anon:${patientId}`,
         email: null,
+        phone: null,
+        birthDate: null,
+        addressLine: null,
+        addressCity: null,
+        addressState: null,
+        addressZip: null,
+        emergencyContactName: null,
+        emergencyContactPhone: null,
+        commsPrefs: Prisma.JsonNull,
         adminNotes: null,
         bestContactTime: null,
         usualModality: null,
@@ -61,6 +71,7 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
     await tx.clinicalDocument.deleteMany({ where: { patientId } });
     await tx.formRequest.deleteMany({ where: { patientId } }); // respostas (clínicas ou termos) somem com o titular
     await tx.recurringSeries.updateMany({ where: { patientId }, data: { isActive: false } });
+    await tx.patientTag.deleteMany({ where: { patientId } }); // etiquetas podem identificar ("convênio X")
     await tx.waitlistEntry.updateMany({ where: { patientId }, data: { note: null, removedReason: null, status: "REMOVED" } });
     // Auditoria: mantém o rastro (quem, quando, qual ação), remove o conteúdo.
     // SQL direto: updateMany do Prisma não aceita NULL literal em campos Json.

@@ -16,6 +16,7 @@ import { purgeRateLimits } from "@/lib/rate-limit";
 import { anonymizeExpiredPatients, purgeOldWebhookEvents } from "@/lib/lgpd/anonymize";
 import { purgeStaleMfaVerifications } from "@/lib/mfa/service";
 import { purgeSessions } from "@/lib/sessions";
+import { expirePurchases } from "@/lib/packages/service";
 
 /**
  * Rotinas periódicas do WhatsApp. Chamadas pelo cron (src/app/api/cron) a
@@ -293,7 +294,8 @@ export async function runCron() {
   const purgedRateLimits = await purgeRateLimits();
   const lgpd = await anonymizeExpiredPatients();
   const purgedWebhookEvents = await purgeOldWebhookEvents();
+  const packagesExpired = await expirePurchases();
   const purgedMfa = await purgeStaleMfaVerifications();
   const purgedSessions = await purgeSessions();
-  return { webhook, expiry, waitlistSynced, forms, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, purgedMfa, purgedSessions, at: new Date().toISOString() };
+  return { webhook, expiry, waitlistSynced, forms, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, packagesExpired, purgedMfa, purgedSessions, at: new Date().toISOString() };
 }

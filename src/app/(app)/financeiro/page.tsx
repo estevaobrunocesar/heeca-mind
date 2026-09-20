@@ -42,7 +42,7 @@ export default async function FinancePage({ searchParams }: PageProps<"/financei
 
   const proFilter = actor.activeProfessionalId ? { professionalId: actor.activeProfessionalId } : { organizationId: actor.organizationId };
 
-  const [sessions, receivedInMonth] = await Promise.all([
+  const [sessions, receivedInMonth, packageSales] = await Promise.all([
     db.appointment.findMany({
       where: { ...proFilter, startsAt: { gte: start, lt: end }, status: { in: [...REVENUE_STATUSES, "NO_SHOW"] } },
       orderBy: { startsAt: "asc" },
@@ -61,8 +61,14 @@ export default async function FinancePage({ searchParams }: PageProps<"/financei
     // Caixa: o que efetivamente entrou no mês, independente de quando foi a sessão.
     db.payment.groupBy({
       by: ["method"],
-      where: { appointment: proFilter, paidAt: { gte: start, lt: end } },
+      where: { OR: [{ appointment: proFilter }, { packagePurchase: proFilter }], paidAt: { gte: start, lt: end } },
       _sum: { amountCents: true },
+    }),
+    // Pacotes vendidos no mês: a receita da sessão coberta por pacote é esta, não a sessão.
+    db.packagePurchase.findMany({
+      where: { ...proFilter, purchasedAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
+      select: { id: true, nameSnapshot: true, priceCents: true, paymentStatus: true, purchasedAt: true, patient: { select: { id: true, name: true } } },
+      orderBy: { purchasedAt: "asc" },
     }),
   ]);
 
@@ -72,12 +78,16 @@ export default async function FinancePage({ searchParams }: PageProps<"/financei
   const upcoming = sessions.filter((s) => s.status === "CONFIRMED" || s.status === "AWAITING_PAYMENT");
   const sum = (xs: { priceCents: number }[]) => xs.reduce((a, s) => a + s.priceCents, 0);
 
-  const realizedTotal = sum(realized.filter((s) => s.paymentStatus !== "WAIVED"));
+  // Sessões cobertas por pacote não entram: a receita delas é a venda do pacote (abaixo).
+  const billable = (s: { paymentStatus: string }) => s.paymentStatus !== "WAIVED" && s.paymentStatus !== "PACKAGE";
+  const realizedTotal = sum(realized.filter(billable));
+  const packagesTotal = sum(packageSales);
+  const packagesPending = sum(packageSales.filter((p) => p.paymentStatus === "PENDING"));
   const receivedTotal = receivedInMonth.reduce((a, g) => a + (g._sum.amountCents ?? 0), 0);
   const pending = sessions.filter((s) => s.status === "COMPLETED" && s.paymentStatus === "PENDING");
-  const pendingTotal = sum(pending);
-  const forecast = realizedTotal + sum(upcoming);
-  const noShowLost = sum(sessions.filter((s) => s.status === "NO_SHOW" && s.paymentStatus !== "PAID"));
+  const pendingTotal = sum(pending) + packagesPending;
+  const forecast = realizedTotal + sum(upcoming.filter(billable)) + packagesTotal;
+  const noShowLost = sum(sessions.filter((s) => s.status === "NO_SHOW" && s.paymentStatus !== "PAID" && s.paymentStatus !== "PACKAGE"));
 
   const monthLink = (ym: string) => `/financeiro?month=${ym}`;
 
@@ -111,8 +121,11 @@ export default async function FinancePage({ searchParams }: PageProps<"/financei
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="card">
           <p className="text-xs uppercase tracking-wide text-text-muted">Realizado</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatBRL(realizedTotal)}</p>
-          <p className="text-xs text-text-muted">{realized.length} sessão(ões) concluída(s)</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatBRL(realizedTotal + packagesTotal)}</p>
+          <p className="text-xs text-text-muted">
+            {realized.length} sessão(ões) concluída(s)
+            {packageSales.length > 0 && <> · {packageSales.length} pacote(s) {formatBRL(packagesTotal)}</>}
+          </p>
         </div>
         <div className="card">
           <p className="text-xs uppercase tracking-wide text-text-muted">Recebido no mês</p>
@@ -126,7 +139,10 @@ export default async function FinancePage({ searchParams }: PageProps<"/financei
         <div className="card">
           <p className="text-xs uppercase tracking-wide text-text-muted">A receber</p>
           <p className={`mt-1 text-2xl font-semibold tabular-nums ${pendingTotal > 0 ? "text-warning" : ""}`}>{formatBRL(pendingTotal)}</p>
-          <p className="text-xs text-text-muted">{pending.length} sessão(ões) concluída(s) sem pagamento</p>
+          <p className="text-xs text-text-muted">
+            {pending.length} sessão(ões) concluída(s) sem pagamento
+            {packagesPending > 0 && <> · pacotes {formatBRL(packagesPending)}</>}
+          </p>
         </div>
         <div className="card">
           <p className="text-xs uppercase tracking-wide text-text-muted">Previsto no mês</p>
@@ -175,6 +191,8 @@ export default async function FinancePage({ searchParams }: PageProps<"/financei
                         <span className="text-xs text-success">Pago{s.paymentMethod ? ` · ${PAYMENT_METHOD_LABEL[s.paymentMethod]}` : ""}</span>
                       ) : s.paymentStatus === "WAIVED" ? (
                         <span className="text-xs text-text-muted">Isento</span>
+                      ) : s.paymentStatus === "PACKAGE" ? (
+                        <span className="text-xs text-primary">Pacote</span>
                       ) : s.status === "COMPLETED" || s.status === "NO_SHOW" ? (
                         <QuickPay appointmentId={s.id} defaultMethod={(s.patient.preferredPaymentMethod ?? "PIX") as PaymentMethod} />
                       ) : (

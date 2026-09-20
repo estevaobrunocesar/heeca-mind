@@ -177,19 +177,23 @@ export function Checkbox({
   name,
   defaultChecked,
   hint,
+  value,
 }: {
   label: string;
   name: string;
   defaultChecked?: boolean;
   hint?: string;
+  /** Para grupos (vários checkboxes com o mesmo name): o valor enviado. */
+  value?: string;
 }) {
-  const id = `field-${name}`;
+  const id = value ? `field-${name}-${value}` : `field-${name}`;
   return (
     <div className="flex items-start gap-3">
       <input
         id={id}
         name={name}
         type="checkbox"
+        value={value}
         defaultChecked={defaultChecked}
         className="mt-1 h-4 w-4 rounded border-border accent-primary"
       />

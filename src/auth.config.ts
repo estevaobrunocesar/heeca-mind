@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
  * NÃO importe Prisma ou bcrypt aqui — este arquivo roda no edge runtime.
  */
 
-const PROTECTED_PREFIXES = ["/dashboard", "/agenda", "/pacientes", "/servicos", "/configuracoes", "/mensagens", "/financeiro", "/bloqueado"];
+const PROTECTED_PREFIXES = ["/dashboard", "/agenda", "/pacientes", "/servicos", "/configuracoes", "/mensagens", "/financeiro", "/pacotes", "/bloqueado"];
 
 export const authConfig = {
   pages: {

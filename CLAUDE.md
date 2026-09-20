@@ -58,7 +58,8 @@ prisma/                schema, migrations, seed
 | 6 Agendamento público | ✅ modalidade → mês → dia → horário → dados + LGPD; confirmação/cancelamento por token |
 | 7 WhatsApp | ✅ dispatcher com retry, webhook (status + respostas), expiração de pendentes, link de sessão, painel /mensagens — falta só credenciais reais da Meta |
 | 8 Dashboard | ✅ sessões do dia, próxima, pacientes ativos, confirmadas, pendentes, cancelamentos, reagendamentos, online/presencial, faturamento, comparecimento |
-| 9 Financeiro | ✅ pagamento (parcial/integral/isento/desfazer) na sessão, /financeiro por mês com realizado/recebido/a receber/previsto, marcar pago em 1 clique, CSV |
+| 9 Financeiro | ✅ pagamento (parcial/integral/isento/desfazer) na sessão, /financeiro por mês com realizado/recebido/a receber/previsto (+ pacotes vendidos), marcar pago em 1 clique, CSV com origem |
+| 10 Pacotes | ✅ catálogo, venda na ficha, vínculo/auto-vínculo, consumo em concluída/falta (política), reversão, expiração |
 
 ## Segmento e registro profissional (Mind, etapa 0)
 
@@ -73,6 +74,14 @@ prisma/                schema, migrations, seed
 - Cadastro da clínica (§6) em `/configuracoes/clinica` (só OWNER): `organizationSchema`; CPF/CNPJ validado por dígito verificador em `src/lib/br-document.ts` (puro), guardado só dígitos. O bloco nome/slug saiu da aba Equipe.
 - `AppointmentStatus.IN_PROGRESS` ("Em atendimento"): ação `start`; em atendimento só conclui.
 - **Fronteira cliente/servidor**: `src/lib/validation/*`, `comms-prefs`, `registration`, `br-document` são importados por componentes cliente — nunca importar `@/generated/prisma/client` (runtime) neles; `Prisma.JsonNull` fica nas actions. O `tsc` não pega isso; só o `next build`/Turbopack.
+
+## Pacotes de sessões (Mind, etapa 3 — §20, decisões D1/D2)
+
+- `src/lib/packages/rules.ts` é puro e testado: **saldo = total − consumos não revertidos, sempre calculado**; `effectiveStatus` (CANCELLED > EXHAUSTED > EXPIRED > ACTIVE); `covers` (mesmo profissional; `serviceIds` vazio = qualquer); `consumeReasonFor` (COMPLETED sempre; NO_SHOW se `ProfessionalPolicy.noShowConsumesPackage`); `expiresAtFor` = fim do dia civil no fuso da organização. `service.ts` liga ao banco.
+- `Package` (catálogo, por profissional como os serviços) → `PackagePurchase` (venda; **snapshot** de nome, sessões, preço e cobertura) → `PackageConsumption` (uma por sessão, `appointmentId` único; reverter marca `revertedAt`, não apaga).
+- Sessão coberta: `Appointment.packagePurchaseId` + `paymentStatus = PACKAGE` — **não entra em realizado nem em a receber**; a receita é a venda (`Payment.packagePurchaseId`). `Payment` é polimórfico com check constraint: exatamente um de `appointmentId`/`packagePurchaseId`. Financeiro e CSV tratam PACKAGE e listam as vendas do mês.
+- Fluxo: vincular (ficha/sessão, ou `autoLinkPackage` na criação quando há **um único** pacote ativo que cobre) → consumir em `transition()` via `consumeIfDue` (idempotente) → reverter com motivo. Cancelar a compra devolve as sessões futuras vinculadas a PENDING. Cron: `expirePurchases`.
+- Cliente: `PackagesPanel` (ficha), `PackageSection` (sessão), `/pacotes` (catálogo). Formulários que fecham ao salvar usam `useEffect` em `state.ok`, nunca chamada no render.
 
 ## Padrões de formulário
 

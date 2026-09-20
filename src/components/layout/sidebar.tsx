@@ -11,6 +11,7 @@ export const NAV = [
   { href: "/agenda", label: "Agenda" },
   { href: "/pacientes", label: "Pacientes" },
   { href: "/servicos", label: "Serviços" },
+  { href: "/pacotes", label: "Pacotes" },
   { href: "/financeiro", label: "Financeiro" },
   { href: "/mensagens", label: "Mensagens" },
   { href: "/configuracoes", label: "Configurações" },

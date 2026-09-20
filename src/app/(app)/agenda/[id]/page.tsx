@@ -9,6 +9,9 @@ import { requireActor } from "@/lib/session";
 import { formatDateTimeBR, slotLabelInTz, toLocalFields } from "@/lib/time";
 import { AdminNoteForm, OnlineLinkForm, StatusActions } from "./appointment-actions";
 import { PaymentSection } from "./payment-section";
+import { PackageSection } from "./package-section";
+import { candidatesForAppointment } from "@/lib/packages/service";
+import { balance } from "@/lib/packages/rules";
 import { canViewFinancials } from "@/lib/permissions";
 import { canWriteFor } from "@/lib/clinical";
 import { canManageSchedule } from "@/lib/permissions";
@@ -29,7 +32,7 @@ const TONE_BADGE = {
   muted: "bg-surface-muted text-text-muted",
 } as const;
 
-const PAYMENT_LABEL = { PENDING: "Pendente", PAID: "Pago", WAIVED: "Isento" } as const;
+const PAYMENT_LABEL = { PENDING: "Pendente", PAID: "Pago", WAIVED: "Isento", PACKAGE: "Coberto por pacote" } as const;
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -53,11 +56,14 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
       series: { select: { id: true, frequency: true, isActive: true } },
       clinicalNotes: { where: { kind: "EVOLUTION", deletedAt: null }, select: { id: true } },
       payments: { orderBy: { paidAt: "desc" } },
+      packagePurchase: { select: { id: true, nameSnapshot: true, sessionsTotal: true, consumptions: { select: { revertedAt: true } } } },
+      packageConsumption: { select: { reason: true, consumedAt: true, revertedAt: true } },
     },
   });
   if (!a) notFound();
 
   const tz = a.professional.organization.timezone;
+  const packageCandidates = a.packagePurchase ? [] : await candidatesForAppointment(actor, a.id);
   const day = toLocalFields(a.startsAt, tz).date;
   const badge = TONE_BADGE[STATUS_TONE[a.status]];
 
@@ -174,7 +180,14 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
         </div>
 
         <aside className="space-y-6">
-          {canViewFinancials(actor, a.professionalId) && (
+          <PackageSection
+            appointmentId={a.id}
+            canManage={canManageSchedule(actor, a.professionalId)}
+            tz={tz}
+            linked={a.packagePurchase ? { id: a.packagePurchase.id, name: a.packagePurchase.nameSnapshot, balance: balance(a.packagePurchase, a.packagePurchase.consumptions), consumed: a.packageConsumption && !a.packageConsumption.revertedAt ? { reason: a.packageConsumption.reason, consumedAt: a.packageConsumption.consumedAt.toISOString() } : null } : null}
+            candidates={packageCandidates.map((c) => ({ ...c, expiresAt: c.expiresAt.toISOString() }))}
+          />
+          {canViewFinancials(actor, a.professionalId) && a.paymentStatus !== "PACKAGE" && (
             <PaymentSection
               appointmentId={a.id}
               priceCents={a.priceCents}

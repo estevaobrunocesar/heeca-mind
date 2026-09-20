@@ -86,7 +86,7 @@ export default async function DashboardPage() {
   const online = countable.filter((a) => a.modality === "ONLINE").length;
   const inPerson = countable.length - online;
   const forecast = monthAppts
-    .filter((a) => ["COMPLETED", "CONFIRMED", "AWAITING_PAYMENT"].includes(a.status) && a.paymentStatus !== "WAIVED")
+    .filter((a) => ["COMPLETED", "CONFIRMED", "AWAITING_PAYMENT"].includes(a.status) && a.paymentStatus !== "WAIVED" && a.paymentStatus !== "PACKAGE")
     .reduce((s, a) => s + a.priceCents, 0);
   const pendingMoney = completed.filter((a) => a.paymentStatus === "PENDING").reduce((s, a) => s + a.priceCents, 0);
 

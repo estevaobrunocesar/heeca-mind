@@ -18,6 +18,8 @@ import { formatDateBR } from "@/lib/time";
 import { canManageSchedule } from "@/lib/permissions";
 import { listRequestsForPatient } from "@/lib/forms";
 import { FormsPanel } from "./formularios/forms-panel";
+import { listPurchasesForPatient } from "@/lib/packages/service";
+import { PackagesPanel } from "./pacotes/packages-panel";
 
 export const metadata: Metadata = { title: "Paciente" };
 
@@ -87,11 +89,15 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
   const attendance = completed + noShow > 0 ? Math.round((completed / (completed + noShow)) * 100) : null;
   const upcoming = p.appointments.filter((a) => a.startsAt > now && ACTIVE_STATUSES.includes(a.status as (typeof ACTIVE_STATUSES)[number])).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const pendingPayment = p.appointments.filter((a) => a.status === "COMPLETED" && a.paymentStatus === "PENDING").reduce((s, a) => s + a.priceCents, 0);
+  const purchases = await listPurchasesForPatient(actor, p.id);
   const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const showMoney = canViewAnyFinancials(actor);
   const canOpenRecord = !p.anonymizedAt && (await canOpenClinicalRecord(actor, p.id));
   const formsPro = actor.activeProfessionalId;
   const canSendForms = !!formsPro && !p.deletedAt && !p.anonymizedAt && canManageSchedule(actor, formsPro);
+  const catalog = actor.activeProfessionalId
+    ? (await db.package.findMany({ where: { professionalId: actor.activeProfessionalId, isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, sessionsCount: true, priceCents: true, validityDays: true } })).map((k) => ({ ...k }))
+    : [];
   const [formRequests, formTemplates] = await Promise.all([
     listRequestsForPatient(actor, p.id),
     canSendForms ? db.formTemplate.findMany({ where: { professionalId: formsPro!, isActive: true }, orderBy: { title: "asc" }, select: { id: true, title: true, dataClass: true } }) : Promise.resolve([]),
@@ -194,7 +200,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
                         <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums">
                           {formatBRL(a.priceCents)}
                           <span className={`block text-xs ${a.paymentStatus === "PAID" ? "text-success" : a.paymentStatus === "WAIVED" ? "text-text-muted" : a.status === "COMPLETED" ? "text-warning" : "text-text-muted"}`}>
-                            {a.paymentStatus === "PAID" ? "pago" : a.paymentStatus === "WAIVED" ? "isento" : "pendente"}
+                            {a.paymentStatus === "PAID" ? "pago" : a.paymentStatus === "WAIVED" ? "isento" : a.paymentStatus === "PACKAGE" ? "pacote" : "pendente"}
                           </span>
                         </td>
                         )}
@@ -256,6 +262,15 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
               </div>
             )}
           </section>
+
+          <PackagesPanel
+            patientId={p.id}
+            canSell={!p.deletedAt && !p.anonymizedAt && !!actor.activeProfessionalId && canManageSchedule(actor, actor.activeProfessionalId)}
+            showMoney={showMoney}
+            tz={tz}
+            purchases={purchases.map((x) => ({ id: x.id, name: x.nameSnapshot, professional: x.professional.displayName, total: x.sessionsTotal, balance: x.balance, status: x.effective, expiresAt: x.expiresAt.toISOString(), priceCents: x.priceCents, paidCents: x.paidCents, paymentStatus: x.paymentStatus }))}
+            catalog={catalog}
+          />
 
           <section className="card">
             <h2 className="mb-1 text-base font-semibold">Prontuário</h2>

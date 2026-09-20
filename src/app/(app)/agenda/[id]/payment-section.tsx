@@ -39,7 +39,7 @@ export function PaymentSection({
       : paymentStatus === "WAIVED"
         ? "bg-surface-muted text-text-muted"
         : "bg-warning/15 text-warning";
-  const label = paymentStatus === "PAID" ? "Pago" : paymentStatus === "WAIVED" ? "Isento" : paid > 0 ? "Parcial" : "Pendente";
+  const label = paymentStatus === "PAID" ? "Pago" : paymentStatus === "WAIVED" ? "Isento" : paymentStatus === "PACKAGE" ? "Pacote" : paid > 0 ? "Parcial" : "Pendente";
 
   return (
     <section className="card">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { FormError, FormSuccess, SubmitButton, TextArea } from "@/components/ui/form";
+import { Checkbox, FormError, FormSuccess, SubmitButton, TextArea } from "@/components/ui/form";
 import type { FormState } from "@/lib/form";
 import { updatePolicyAction } from "../actions";
 
@@ -13,10 +13,13 @@ export type PolicyValues = {
   onlineInstructions: string | null;
   paymentInfo: string | null;
   terms: string | null;
+  noShowConsumesPackage: boolean;
 };
 
+type TextField = Exclude<keyof PolicyValues, "noShowConsumesPackage">;
+
 const FIELDS: Array<{
-  name: keyof PolicyValues;
+  name: TextField;
   label: string;
   hint: string;
   placeholder?: string;
@@ -69,6 +72,14 @@ export function PolicyForm({ policy }: { policy: PolicyValues }) {
           errors={fe?.[f.name]}
         />
       ))}
+      <div className="rounded-lg border border-border bg-surface-muted/50 p-3">
+        <Checkbox
+          label="Falta desconta uma sessão do pacote"
+          name="noShowConsumesPackage"
+          hint="Quando o paciente tem pacote e não comparece, a sessão é descontada do saldo (a hora foi reservada). Desmarque para não descontar."
+          defaultChecked={v ? v.noShowConsumesPackage === "on" : policy.noShowConsumesPackage}
+        />
+      </div>
       <div className="flex justify-end">
         <div className="w-40">
           <SubmitButton pendingText="Salvando…">Salvar políticas</SubmitButton>

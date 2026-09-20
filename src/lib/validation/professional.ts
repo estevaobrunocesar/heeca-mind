@@ -181,6 +181,7 @@ export const policySchema = z.object({
   onlineInstructions: optionalText(1500),
   paymentInfo: optionalText(1000),
   terms: optionalText(3000),
+  noShowConsumesPackage: checkbox, // D2
 });
 
 export const retentionSchema = z.object({

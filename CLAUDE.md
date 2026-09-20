@@ -220,7 +220,8 @@ prisma/                schema, migrations, seed
 - Seletor de profissional: cookie `hp_pro` (`setActiveProfessionalAction`), validado no tenant a cada requisição em `resolveActiveProfessional`. PROFESSIONAL ignora o cookie.
 - Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com registro profissional/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.
 - Página pública da clínica: `/clinica/[slug]` (Organization.slug) lista profissionais ativos → `/agendar/[slug]`.
-- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica|formulario|documento|portal|sso`.
+- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica|formulario|documento|portal|pesquisa|sso`.
+- Multiunidade (§31) é Fase 2: existe só a tabela `Unit` e `unitId?` em Professional/Appointment, sempre nulos. Não criar tela, filtro nem escrita nesses campos sem decisão explícita; quando entrar, `unit.organizationId` tem de ser o do tenant (cobrir em `check:tenant`).
 - Migrações com aviso interativo (índice único): `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` para a pasta e `prisma migrate deploy`.
 
 ## Deploy (ver docs/DEPLOY.md)

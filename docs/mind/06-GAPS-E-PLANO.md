@@ -30,7 +30,7 @@
 | 28 | Reativação | ❌ | consulta + envio por clique |
 | 29 | Pesquisa de experiência | ❌ | `ExperienceSurvey` + link público |
 | 30 | Multi-profissional | ✅ | + comissão |
-| 31 | Multiunidade | — | só tabela `Unit` (Fase 2) |
+| 31 | Multiunidade | ✅ tabela | `Unit` + `unitId?` em Professional/Appointment criados (sem telas); Fase 2 liga |
 | 38 | UX padrão Heeca | ❌ | adotar `ui/` (tokens, casca, `layout.md`) |
 | 39 | Menu | 🟡 | renomear/reordenar: Dashboard · Agenda · Clientes · Serviços · **Pacotes** · **Documentos** · Financeiro · **Relatórios** · WhatsApp(=Mensagens) · Configurações · [Clínico] |
 

@@ -176,10 +176,12 @@ model ReactivationContact { id, organizationId, patientId, professionalId, notif
 ```
 Reativação **não** é tabela de candidatos: é uma consulta (`lastCompletedAt < now − N dias AND followUpStatus = ACTIVE AND sem agendamento futuro`) + o registro do contato feito, sempre por clique humano (mesma filosofia da lista de espera: "nada é oferecido automaticamente").
 
-### Unidade (§31 — só a tabela, sem tela)
+### Unidade (§31 — só a tabela, sem tela) — **criada em 20/09/2026** (`20260920203516_unit_prep`)
 ```prisma
-model Unit { id, organizationId, name, addressLine?, city?, isActive, @@unique([organizationId, name]) }
+model Unit { id, organizationId, name, addressLine?, addressCity?, addressState?, isActive, createdAt, updatedAt, @@unique([organizationId, name]) }
+// Professional.unitId? e Appointment.unitId? (FK SetNull) — nulos; nenhuma tela lê ou escreve.
 ```
+Quando a Fase 2 chegar: presencial herda `unit` do profissional; online fica nula; filtros de agenda/relatório por unidade; nunca uma unidade de outra `organizationId` (índice e checagem em `check:tenant`).
 
 ## 4. Índices
 

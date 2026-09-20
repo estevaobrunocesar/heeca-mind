@@ -20,6 +20,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   WAITLIST_JOINED: "Lista de espera",
   WAITLIST_OFFER: "Oferta de horário",
   FORM_REQUEST: "Formulário",
+  DOCUMENT_REQUEST: "Documento",
   PRO_BOOKING_REQUESTED: "Aviso: novo pedido",
   PRO_BOOKING_CONFIRMED: "Aviso: confirmou",
   PRO_BOOKING_CANCELLED: "Aviso: cancelou",
@@ -28,6 +29,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   PRO_WAITLIST_JOINED: "Aviso: lista de espera",
   PRO_WAITLIST_OFFER_ANSWERED: "Aviso: resposta a oferta",
   PRO_DELEGATION_RECEIVED: "Aviso: delegação",
+  PRO_DOCUMENT_ACCEPTED: "Aviso: documento aceito",
 };
 
 const STATUS_UI: Record<NotificationStatus, { label: string; cls: string }> = {

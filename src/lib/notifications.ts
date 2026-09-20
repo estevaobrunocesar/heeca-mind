@@ -172,6 +172,30 @@ export async function enqueueFormRequest(requestId: string, token: string) {
   });
 }
 
+/** Documento para ler e aceitar (termo, contrato). Token em claro só na mensagem. */
+export async function enqueueDocumentRequest(requestId: string, token: string) {
+  const r = await db.documentRequest.findUniqueOrThrow({
+    where: { id: requestId },
+    select: { organizationId: true, appointmentId: true, titleSnapshot: true, patient: { select: { id: true, name: true, whatsapp: true } }, professional: { select: { displayName: true } } },
+  });
+  const type = "DOCUMENT_REQUEST" as const;
+  return db.notification.create({
+    data: {
+      organizationId: r.organizationId,
+      appointmentId: r.appointmentId,
+      patientId: r.patient.id,
+      channel: "WHATSAPP",
+      type,
+      recipient: r.patient.whatsapp,
+      templateName: TEMPLATES[type].name,
+      payload: {
+        bodyVariables: buildVariables(type, { patientFirstName: r.patient.name.split(" ")[0] ?? r.patient.name, professionalName: r.professional.displayName, documentTitle: r.titleSnapshot }),
+        buttons: buildButtons(type, { documentToken: token }),
+      } satisfies WhatsAppPayload,
+    },
+  });
+}
+
 /**
  * Confirmação de entrada na lista de espera. Sem agendamento: a notificação
  * fica ligada só ao paciente.

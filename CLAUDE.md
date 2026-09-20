@@ -60,6 +60,7 @@ prisma/                schema, migrations, seed
 | 8 Dashboard | ✅ sessões do dia, próxima, pacientes ativos, confirmadas, pendentes, cancelamentos, reagendamentos, online/presencial, faturamento, comparecimento |
 | 9 Financeiro | ✅ pagamento (parcial/integral/isento/desfazer) na sessão, /financeiro por mês com realizado/recebido/a receber/previsto (+ pacotes vendidos), marcar pago em 1 clique, CSV com origem |
 | 10 Pacotes | ✅ catálogo, venda na ficha, vínculo/auto-vínculo, consumo em concluída/falta (política), reversão, expiração |
+| 11 Documentos | ✅ modelos versionados com variáveis, envio por WhatsApp, aceite com hash, registro imprimível, envio automático na 1ª sessão |
 
 ## Segmento e registro profissional (Mind, etapa 0)
 
@@ -82,6 +83,14 @@ prisma/                schema, migrations, seed
 - Sessão coberta: `Appointment.packagePurchaseId` + `paymentStatus = PACKAGE` — **não entra em realizado nem em a receber**; a receita é a venda (`Payment.packagePurchaseId`). `Payment` é polimórfico com check constraint: exatamente um de `appointmentId`/`packagePurchaseId`. Financeiro e CSV tratam PACKAGE e listam as vendas do mês.
 - Fluxo: vincular (ficha/sessão, ou `autoLinkPackage` na criação quando há **um único** pacote ativo que cobre) → consumir em `transition()` via `consumeIfDue` (idempotente) → reverter com motivo. Cancelar a compra devolve as sessões futuras vinculadas a PENDING. Cron: `expirePurchases`.
 - Cliente: `PackagesPanel` (ficha), `PackageSection` (sessão), `/pacotes` (catálogo). Formulários que fecham ao salvar usam `useEffect` em `state.ok`, nunca chamada no render.
+
+## Documentos administrativos e consentimentos (Mind, etapa 4 — §15, D6)
+
+- `src/lib/documents/rules.ts` (puro, testado): variáveis permitidas (`DOCUMENT_VARIABLES` — nada clínico), `renderDocument` com `missing`, `bodyHash` (texto canônico), `acceptanceHash` = sha256(bodyHash|nome normalizado|instante ISO|IP), `nameMatches` (completo ou primeiro+último, sem acento/caixa), `isNewVersion`, modelos iniciais.
+- `DocumentTemplate` (por profissional; salvar com título/texto diferente **incrementa `version`**) → `DocumentRequest` (snapshot **renderizado** + hash; token só-hash; um em aberto por modelo+paciente; reenviar troca token e snapshot). Mesmo desenho dos formulários; TTL 30 dias; cron expira e faz o envio automático dos "exigir antes da 1ª sessão".
+- Aceite em `/documento/[token]` (rota pública no proxy): nome precisa conferir com o cadastro; grava nome, IP, UA, hash; e-mail `PRO_DOCUMENT_ACCEPTED` ao profissional; WhatsApp `heeca_mind_documento`. Aceito não se cancela — envia-se nova versão. "PDF" = página de impressão (`PrintButton`), como o prontuário.
+- Anonimização (D6): mantém texto e hashes, zera nome/IP/UA; pendentes viram REVOKED. Registro interno em `/pacientes/[id]/documentos/[requestId]` (auditado como `document.view_record`).
+- Os `FormTemplate` com `dataClass=ADMINISTRATIVE` continuam válidos como questionários; termos novos devem nascer como documentos.
 
 ## Padrões de formulário
 

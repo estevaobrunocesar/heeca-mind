@@ -24,7 +24,8 @@ export type ProEventInput =
   | { event: "FORM_SUBMITTED"; formRequestId: string }
   | { event: "WAITLIST_JOINED"; waitlistEntryId: string }
   | { event: "WAITLIST_OFFER_ANSWERED"; waitlistEntryId: string; appointmentId: string; accepted: boolean }
-  | { event: "DELEGATION_RECEIVED"; delegationId: string };
+  | { event: "DELEGATION_RECEIVED"; delegationId: string }
+  | { event: "DOCUMENT_ACCEPTED"; documentRequestId: string };
 
 const TYPE: Record<ProEvent, NotificationType> = {
   BOOKING_REQUESTED: "PRO_BOOKING_REQUESTED",
@@ -35,6 +36,7 @@ const TYPE: Record<ProEvent, NotificationType> = {
   WAITLIST_JOINED: "PRO_WAITLIST_JOINED",
   WAITLIST_OFFER_ANSWERED: "PRO_WAITLIST_OFFER_ANSWERED",
   DELEGATION_RECEIVED: "PRO_DELEGATION_RECEIVED",
+  DOCUMENT_ACCEPTED: "PRO_DOCUMENT_ACCEPTED",
 };
 
 type Built = { professionalId: string; organizationId: string; patientId?: string; appointmentId?: string; subject: string; lines: string[]; link: string };
@@ -87,6 +89,18 @@ async function build(input: ProEventInput): Promise<Built | null> {
       return input.accepted
         ? { professionalId: e.professionalId, organizationId: e.organizationId, patientId: e.patientId, appointmentId: input.appointmentId, subject: `${e.patient.name} aceitou o horário oferecido`, lines: [`${e.patient.name} confirmou o horário de ${when} oferecido pela lista de espera.`], link: `${base()}/agenda/${input.appointmentId}` }
         : { professionalId: e.professionalId, organizationId: e.organizationId, patientId: e.patientId, subject: `${e.patient.name} recusou o horário oferecido`, lines: [`${e.patient.name} não ficou com o horário de ${when}. A pessoa continua na lista de espera; o horário voltou a ficar livre.`], link: `${base()}/agenda/espera` };
+    }
+    case "DOCUMENT_ACCEPTED": {
+      const r = await db.documentRequest.findUnique({ where: { id: input.documentRequestId }, select: { id: true, organizationId: true, professionalId: true, patientId: true, titleSnapshot: true, templateVersion: true, patient: { select: { name: true } } } });
+      if (!r) return null;
+      return {
+        professionalId: r.professionalId,
+        organizationId: r.organizationId,
+        patientId: r.patientId,
+        subject: `${r.patient.name} aceitou: ${r.titleSnapshot}`,
+        lines: [`${r.patient.name} leu e aceitou "${r.titleSnapshot}" (versão ${r.templateVersion}).`, "O registro do aceite está na ficha do paciente."],
+        link: `${base()}/pacientes/${r.patientId}/documentos/${r.id}`,
+      };
     }
     case "DELEGATION_RECEIVED": {
       const d = await db.clinicalDelegation.findUnique({

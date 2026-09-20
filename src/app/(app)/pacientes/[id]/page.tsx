@@ -20,6 +20,8 @@ import { listRequestsForPatient } from "@/lib/forms";
 import { FormsPanel } from "./formularios/forms-panel";
 import { listPurchasesForPatient } from "@/lib/packages/service";
 import { PackagesPanel } from "./pacotes/packages-panel";
+import { DocumentsPanel } from "./documentos/documents-panel";
+import { listDocumentsForPatient } from "@/lib/documents/service";
 
 export const metadata: Metadata = { title: "Paciente" };
 
@@ -98,6 +100,10 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
   const catalog = actor.activeProfessionalId
     ? (await db.package.findMany({ where: { professionalId: actor.activeProfessionalId, isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, sessionsCount: true, priceCents: true, validityDays: true } })).map((k) => ({ ...k }))
     : [];
+  const [documentRows, documentTemplates] = await Promise.all([
+    listDocumentsForPatient(actor, p.id),
+    canSendForms ? db.documentTemplate.findMany({ where: { professionalId: formsPro!, isActive: true }, orderBy: { title: "asc" }, select: { id: true, title: true, kind: true, version: true } }) : Promise.resolve([]),
+  ]);
   const [formRequests, formTemplates] = await Promise.all([
     listRequestsForPatient(actor, p.id),
     canSendForms ? db.formTemplate.findMany({ where: { professionalId: formsPro!, isActive: true }, orderBy: { title: "asc" }, select: { id: true, title: true, dataClass: true } }) : Promise.resolve([]),
@@ -270,6 +276,13 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
             tz={tz}
             purchases={purchases.map((x) => ({ id: x.id, name: x.nameSnapshot, professional: x.professional.displayName, total: x.sessionsTotal, balance: x.balance, status: x.effective, expiresAt: x.expiresAt.toISOString(), priceCents: x.priceCents, paidCents: x.paidCents, paymentStatus: x.paymentStatus }))}
             catalog={catalog}
+          />
+
+          <DocumentsPanel
+            patientId={p.id}
+            canSend={canSendForms}
+            templates={documentTemplates}
+            rows={documentRows.map((r) => ({ id: r.id, kind: r.kind, title: r.titleSnapshot, version: r.templateVersion, status: r.status, sentAt: r.sentAt.toISOString(), acceptedAt: r.acceptedAt?.toISOString() ?? null, expiresAt: r.expiresAt.toISOString(), professional: r.professional.displayName }))}
           />
 
           <section className="card">

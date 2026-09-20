@@ -68,6 +68,7 @@ Fonte da verdade: `src/lib/whatsapp/templates.ts`. Dois grupos:
 | WAITLIST_JOINED | `heeca_mind_lista_espera` | — |
 | WAITLIST_OFFER | `heeca_mind_oferta_horario` | URL `/confirmar/<token>` |
 | FORM_REQUEST | `heeca_mind_formulario` | URL `/formulario/<token>` |
+| DOCUMENT_REQUEST | `heeca_mind_documento` | URL `/documento/<token>` |
 
 Textos de referência de todos estão no `reference` de cada entrada em `templates.ts`. Mudar texto de template aprovado = novo nome.
 

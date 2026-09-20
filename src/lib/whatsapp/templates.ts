@@ -25,7 +25,7 @@ export type WhatsAppNotificationType = Exclude<NotificationType, `PRO_${string}`
 
 export type TemplateButtonSpec =
   | { type: "quick_reply"; intent: "confirm" | "reschedule" | "cancel" }
-  | { type: "url"; suffix: "confirmationToken" | "formToken" | "professionalSlug"; label: string };
+  | { type: "url"; suffix: "confirmationToken" | "formToken" | "documentToken" | "professionalSlug"; label: string };
 
 export type TemplateSpec = {
   name: string;
@@ -109,6 +109,13 @@ export const TEMPLATES: Record<WhatsAppNotificationType, TemplateSpec> = {
     variables: ["patientFirstName", "professionalName", "modality", "date", "time", "holdHours"],
     buttons: [{ type: "url", suffix: "confirmationToken", label: "Responder" }],
   },
+  DOCUMENT_REQUEST: {
+    name: "heeca_mind_documento",
+    unified: false,
+    reference: "Olá, {{1}}! {{2}} enviou o documento \"{{3}}\" para você ler e aceitar.\nToque abaixo para abrir. O link vale por 30 dias.",
+    variables: ["patientFirstName", "professionalName", "documentTitle"],
+    buttons: [{ type: "url", suffix: "documentToken", label: "Abrir documento" }],
+  },
   FORM_REQUEST: {
     name: "heeca_mind_formulario",
     unified: false,
@@ -122,6 +129,7 @@ export const TEMPLATES: Record<WhatsAppNotificationType, TemplateSpec> = {
 export const URL_PATH_BY_SUFFIX: Record<Extract<TemplateButtonSpec, { type: "url" }>["suffix"], string> = {
   confirmationToken: "/confirmar/",
   formToken: "/formulario/",
+  documentToken: "/documento/",
   professionalSlug: "/agendar/",
 };
 
@@ -147,7 +155,7 @@ export function buildVariables(type: WhatsAppNotificationType, values: Record<st
  */
 export function buildButtons(
   type: WhatsAppNotificationType,
-  ids: { confirmationToken?: string | null; formToken?: string | null; professionalSlug?: string | null },
+  ids: { confirmationToken?: string | null; formToken?: string | null; documentToken?: string | null; professionalSlug?: string | null },
 ): TemplateButton[] | undefined {
   const spec = TEMPLATES[type];
   if (!spec.buttons?.length) return undefined;

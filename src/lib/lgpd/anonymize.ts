@@ -72,6 +72,9 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
     await tx.formRequest.deleteMany({ where: { patientId } }); // respostas (clínicas ou termos) somem com o titular
     await tx.recurringSeries.updateMany({ where: { patientId }, data: { isActive: false } });
     await tx.patientTag.deleteMany({ where: { patientId } }); // etiquetas podem identificar ("convênio X")
+    // D6: o termo aceito é prova contratual — fica o texto e o hash; sai o que identifica a pessoa.
+    await tx.documentRequest.updateMany({ where: { patientId }, data: { acceptName: null, acceptIp: null, acceptUserAgent: null } });
+    await tx.documentRequest.updateMany({ where: { patientId, status: { in: ["PENDING", "VIEWED"] } }, data: { status: "REVOKED", revokeReason: "anonimização" } });
     await tx.waitlistEntry.updateMany({ where: { patientId }, data: { note: null, removedReason: null, status: "REMOVED" } });
     // Auditoria: mantém o rastro (quem, quando, qual ação), remove o conteúdo.
     // SQL direto: updateMany do Prisma não aceita NULL literal em campos Json.

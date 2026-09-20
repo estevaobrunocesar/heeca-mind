@@ -85,6 +85,8 @@ model Organization {
   tags                Tag[]
   packages            Package[]
   packagePurchases    PackagePurchase[]
+  documentTemplates   DocumentTemplate[]
+  documentRequests    DocumentRequest[]
   appointments        Appointment[]
   notifications       Notification[]
   auditLogs           AuditLog[]
@@ -296,6 +298,8 @@ model Professional {
   formRequests                FormRequest[]
   packages                    Package[]
   packagePurchases            PackagePurchase[]
+  documentTemplates           DocumentTemplate[]
+  documentRequests            DocumentRequest[]
 
   @@index([organizationId])
   @@map("professionals")
@@ -491,6 +495,7 @@ model Patient {
   receipts            Receipt[]
   tags                PatientTag[]
   packagePurchases    PackagePurchase[]
+  documentRequests    DocumentRequest[]
 
   @@unique([organizationId, whatsapp])
   @@index([organizationId, name])
@@ -649,6 +654,7 @@ model Appointment {
   series            RecurringSeries?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   packagePurchase   PackagePurchase?   @relation(fields: [packagePurchaseId], references: [id], onDelete: SetNull)
   packageConsumption PackageConsumption?
+  documentRequests  DocumentRequest[]
   payments          Payment[]
   notifications     Notification[]
   receipt           Receipt?
@@ -749,6 +755,96 @@ model PackagePurchase {
 }
 
 /// Uma sessão consumida do pacote. Reverter mantém a linha (histórico) com revertedAt.
+// ───────────────────────────────────────────────────────────────
+// DOCUMENTOS ADMINISTRATIVOS E CONSENTIMENTOS (§15) — src/lib/documents/
+// Termos, contratos, políticas, autorizações. Em claro: guardam o que o paciente
+// ACEITOU, não o que disse. Conteúdo clínico continua no prontuário cifrado.
+// ───────────────────────────────────────────────────────────────
+
+enum DocumentKind {
+  CONSENT // termo de consentimento
+  CONTRACT // contrato de prestação de serviços
+  POLICY // política (cancelamento, faltas, pagamento)
+  AUTHORIZATION // autorização (imagem, contato com terceiros…)
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING // enviado, não aberto
+  VIEWED // aberto pelo link
+  ACCEPTED // aceite registrado (nome, instante, IP, hash)
+  EXPIRED // link venceu sem aceite
+  REVOKED // cancelado pelo profissional
+}
+
+/// Modelo por profissional, versionado: salvar com texto/título diferente incrementa `version`.
+/// Instâncias enviadas guardam o texto renderizado (snapshot), então editar o modelo nunca muda o que foi aceito.
+model DocumentTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  professionalId String
+  kind           DocumentKind @default(CONSENT)
+  title          String
+  /// Texto com variáveis {{paciente.nome}}, {{profissional.nome}}… (src/lib/documents/rules.ts).
+  body           String
+  version        Int          @default(1)
+  isActive       Boolean      @default(true)
+  /// Enviar automaticamente quando a primeira sessão do paciente com este profissional for confirmada.
+  requireBeforeFirstSession Boolean @default(false)
+  createdByUserId String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  requests     DocumentRequest[]
+
+  @@index([professionalId, isActive])
+  @@map("document_templates")
+}
+
+/// Um documento enviado a um paciente. Registra data, hora, versão, usuário e status (§15).
+model DocumentRequest {
+  id              String         @id @default(cuid())
+  organizationId  String
+  professionalId  String
+  patientId       String
+  appointmentId   String?
+  templateId      String
+  templateVersion Int
+  kind            DocumentKind
+  titleSnapshot   String
+  /// Texto final que o paciente viu (variáveis já preenchidas). Base do hash.
+  bodySnapshot    String
+  bodyHash        String // sha256 do bodySnapshot canônico
+  tokenHash       String         @unique // token só na mensagem
+  status          DocumentStatus @default(PENDING)
+  sentAt          DateTime       @default(now())
+  viewedAt        DateTime?
+  acceptedAt      DateTime?
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  revokeReason    String?
+  // Prova do aceite (assinatura eletrônica simples). Anonimização: nome/IP/UA zerados, hash mantido (D6).
+  acceptName      String?
+  acceptIp        String?
+  acceptUserAgent String?
+  acceptanceHash  String? // sha256(bodyHash|nome|instante|ip)
+  createdByUserId String? // null = envio automático
+  createdAt       DateTime       @default(now())
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient      Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment  Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  template     DocumentTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([organizationId, patientId, status])
+  @@index([templateId, patientId, status])
+  @@index([status, expiresAt])
+  @@map("document_requests")
+}
+
 model PackageConsumption {
   id                String    @id @default(cuid())
   packagePurchaseId String
@@ -801,6 +897,7 @@ enum NotificationType {
   WAITLIST_JOINED // entrou na lista de espera
   WAITLIST_OFFER // surgiu um horário; confirmar pelo link
   FORM_REQUEST // preencher formulário pré-atendimento
+  DOCUMENT_REQUEST // ler e aceitar documento (termo, contrato)
   // Avisos ao PROFISSIONAL (canal EMAIL; payload = { subject, text, html })
   PRO_BOOKING_REQUESTED
   PRO_BOOKING_CONFIRMED
@@ -810,6 +907,7 @@ enum NotificationType {
   PRO_WAITLIST_JOINED
   PRO_WAITLIST_OFFER_ANSWERED
   PRO_DELEGATION_RECEIVED
+  PRO_DOCUMENT_ACCEPTED
 }
 
 enum NotificationStatus {

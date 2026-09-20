@@ -57,6 +57,9 @@ Os nomes e a ordem das variáveis precisam bater com `src/lib/whatsapp/templates
 | `hecca_session_link` | Olá, {{1}}! Seu atendimento online com {{2}} é hoje às {{3}}.<br>Plataforma: {{4}}<br>Acesse pelo botão abaixo. | URL dinâmica `…/sessao/{{1}}` |
 | `hecca_cancellation` | Seu atendimento de {{1}} às {{2}} foi cancelado conforme solicitado. Caso queira, entre em contato para verificar novas disponibilidades. | — |
 | `hecca_reschedule` | Olá, {{1}}! Seu atendimento com {{2}} foi reagendado.<br>Nova data: {{3}}<br>Novo horário: {{4}} | — |
+| `hecca_waitlist_joined` | Olá, {{1}}! Você entrou na lista de espera de {{2}}.<br>Assim que surgir um horário compatível, avisaremos por aqui com um link para confirmar. | — |
+| `hecca_waitlist_offer` | Olá, {{1}}! Surgiu um horário com {{2}}.<br>Modalidade: {{3}}<br>Data: {{4}}<br>Horário: {{5}}<br>Ele fica reservado para você por {{6}}h. Clique abaixo para confirmar ou recusar. | URL dinâmica `…/confirmar/{{1}}` |
+| `hecca_form_request` | Olá, {{1}}! {{2}} pede que você preencha o formulário "{{3}}" antes da sua sessão.<br>Leva poucos minutos e suas respostas são confidenciais. Clique abaixo para responder. | URL dinâmica `…/formulario/{{1}}` |
 
 Regra inegociável: nenhuma variável carrega conteúdo clínico. Só nome, profissional, modalidade, data, hora, plataforma e links.
 

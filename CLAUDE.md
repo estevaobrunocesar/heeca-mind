@@ -103,8 +103,8 @@ prisma/                schema, migrations, seed
 ## Pacientes
 
 - Identidade = (organizationId, whatsapp). Criação manual e pública passam pela mesma unicidade; número de paciente excluído bloqueia recriação e sugere restaurar.
-- Exclusão é lógica (`deletedAt`), bloqueada com sessões futuras ativas; encerra `RecurringSeries`. Só OWNER/PROFESSIONAL (`canDeletePatient`). Anonimização definitiva por prazo de retenção é job futuro.
-- A ficha mostra só administrativo; o bloco "Prontuário" é placeholder até o módulo clínico (`canAccessClinicalData`).
+- Exclusão é lógica (`deletedAt`), bloqueada com sessões futuras ativas; encerra `RecurringSeries`. Só OWNER/PROFESSIONAL (`canDeletePatient`). Anonimização definitiva por prazo de retenção: seção LGPD abaixo.
+- A ficha mostra só administrativo; o bloco "Prontuário" abre o módulo clínico só para quem `canOpenClinicalRecord` (seção Prontuário abaixo).
 
 ## Financeiro
 

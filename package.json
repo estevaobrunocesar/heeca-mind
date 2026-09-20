@@ -16,7 +16,7 @@
     "postinstall": "prisma generate",
     "test": "tsx --test tests/**/*.test.ts",
     "cron": "tsx --conditions=react-server scripts/cron.ts",
-    "webhook:sim": "tsx scripts/simulate-webhook.ts",
+    "heeca:sim": "tsx scripts/heeca-sim.ts",
     "check:rate-limit": "tsx --conditions=react-server scripts/rate-limit-check.ts",
     "check:lgpd": "tsx --conditions=react-server scripts/lgpd-check.ts",
     "rotate-key": "tsx --conditions=react-server scripts/rotate-key.ts",

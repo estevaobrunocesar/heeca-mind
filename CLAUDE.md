@@ -17,7 +17,7 @@ npm run db:migrate            # prisma migrate dev
 npm run db:seed               # ana@exemplo.com / senha12345 → /agendar/dra-ana-lucia
 npm run dev
 npm run cron                  # roda dispatcher/expiração/webhook uma vez (dev)
-npm run webhook:sim -- message +5511999990000 "sim"   # simula resposta do paciente
+npm run heeca:sim -- provision ana@exemplo.com          # simula o portal (provision/entitlement/sso) e o Notify (callbacks)
 npm test
 npm run build                 # build de produção (NODE_ENV=production)
 npm run docker:build          # imagem Docker
@@ -98,13 +98,22 @@ prisma/                schema, migrations, seed
 - Rotas públicas (`agendar`, `confirmar`, `sessao`) ficam fora do matcher do proxy — ver `src/proxy.ts`.
 - Rate limit em `src/lib/rate-limit.ts` (janela fixa no Postgres, chaves sha256): público por IP/telefone/profissional + teto de 2 pendentes por número; ações por token; login por IP e e-mail; reset por IP. Sem header de proxy, anônimos caem no balde "unknown". Limpeza no cron.
 
+## Plataforma Heeca — portal e Notify (Mind, etapa 1)
+
+- `src/lib/heeca/core.ts` é puro (HMAC, JWT HS256 do SSO, mapeamentos) e testado; `service.ts` liga ao banco: `provision` (idempotente por `heecaSubscriptionId`), `applyEntitlement` (espelha `accessState/planCode/planLimits`), `resolveSsoUser` (jti de uso único via `RateLimit`). Rotas: `/api/heeca/provision|entitlement` (HMAC) e `/sso/heeca` (JWT → provider `heeca-sso` do Auth.js → mesma `user_sessions`, mesmo MFA).
+- **O portal é dono de plano e cobrança.** Nada aqui cobra o profissional; telas de assinatura apontam para `portalAccountUrl()`. `accessState=BLOCKED` → o layout do app manda para `/bloqueado`; `WARNING` → `AccessBanner`. Com `HEECA_PLATFORM_SECRET` definido, `/cadastro` redireciona para o portal e a action recusa.
+- Usuário criado por SSO nasce com senha inutilizável; "esqueci a senha" cria uma local. Papel do portal OWNER/ADMIN → OWNER; demais → RECEPTIONIST (BILLING → FINANCE quando existir).
+- Simulador: `npm run heeca:sim` (provision, entitlement, sso, notify) — ver docs/DEPLOY.md §5.
+
 ## WhatsApp (ver docs/WHATSAPP.md)
 
+- **Envio só pelo Heeca Notify** (`WHATSAPP_PROVIDER=notify`, `src/lib/whatsapp/notify.ts`): nenhum token da Meta neste app. Callback assinado em `/api/webhooks/notify` → `inbound.ts` traduz para o evento bruto que o dispatcher já processava; `tenantId`/`ref` do callback são conferidos contra a `Notification`.
+- `templates.ts`: unificados da plataforma (`heeca_confirmacao|confirmado|lembrete|cancelado|remarcado`) precisam bater em nº de parâmetros e tipos de botão com `heeca_notify/src/lib/templates.ts` (teste `tests/notify.test.ts` espelha); específicos são `heeca_mind_*`. Botões quick_reply levam `<intenção>:<confirmationToken>`; `applyReply` resolve pelo token (e confere o telefone) antes de cair no texto livre por número. "Remarcar" nunca cancela.
 - `src/lib/whatsapp/dispatcher.ts`: `runCron()` = processa webhook → expira pendentes → envia fila. Chamado por `/api/cron` (Bearer `CRON_SECRET`) a cada minuto ou `npm run cron`.
 - Claim atômico `QUEUED → SENDING` antes de enviar; retry com backoff só para erros retryable; máx. 5 tentativas.
 - Respostas do paciente: `src/lib/whatsapp/replies.ts` (puro, testado). "não" fora do prazo vira `RESCHEDULE_REQUESTED`, não cancela.
 - Botões de URL nos templates usam sempre `confirmationToken` como sufixo (`/confirmar/<token>`, `/sessao/<token>`).
-- Sem credenciais da Meta, `ConsoleWhatsAppProvider` loga e marca como SENT — não confundir com entrega real.
+- `WHATSAPP_PROVIDER=console`: `ConsoleWhatsAppProvider` loga e marca como SENT — não confundir com entrega real. `SKIPPED` do Notify (opt-out/cota) vira FAILED com o motivo, sem retry.
 
 ## Pacientes
 
@@ -157,7 +166,7 @@ prisma/                schema, migrations, seed
 - Seletor de profissional: cookie `hp_pro` (`setActiveProfessionalAction`), validado no tenant a cada requisição em `resolveActiveProfessional`. PROFESSIONAL ignora o cookie.
 - Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com registro profissional/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.
 - Página pública da clínica: `/clinica/[slug]` (Organization.slug) lista profissionais ativos → `/agendar/[slug]`.
-- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica`.
+- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica|formulario|sso`.
 - Migrações com aviso interativo (índice único): `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` para a pasta e `prisma migrate deploy`.
 
 ## Deploy (ver docs/DEPLOY.md)

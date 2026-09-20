@@ -33,6 +33,13 @@ enum Segment {
   THERAPY
 }
 
+/// Espelho de `entitlement.access` do portal: BLOCKED manda o app inteiro para /bloqueado.
+enum AccessState {
+  OK
+  WARNING
+  BLOCKED
+}
+
 model Organization {
   id             String           @id @default(cuid())
   name           String
@@ -40,6 +47,20 @@ model Organization {
   slug           String?          @unique // página pública da clínica: /clinica/<slug>
   timezone       String           @default("America/Sao_Paulo")
   segment        Segment          @default(PSYCHOLOGY)
+
+  // Conta/assinatura no portal heeca.com.br (heeca_site/docs/ENTITLEMENT.md; src/lib/heeca/).
+  // O portal é dono de plano e cobrança; aqui só espelhamos o suficiente para o gate de acesso.
+  heecaSubscriptionId String?     @unique
+  heecaAccountId      String?
+  planCode            String?
+  planFeatures        String[]    @default([])
+  planLimits          Json?
+  accessState         AccessState @default(OK)
+  entitlementSyncedAt DateTime?
+  // Dados da conta vindos do portal (cadastro completo da clínica entra na etapa 2)
+  document            String? // CPF/CNPJ só dígitos
+  contactEmail        String?
+  contactPhone        String?
   /// Anos de guarda após o último atendimento/exclusão antes de anonimizar (CFP: mínimo 5).
   retentionYears Int              @default(5)
   createdAt      DateTime         @default(now())

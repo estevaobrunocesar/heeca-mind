@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { platformEnabled, portalProductUrl } from "@/lib/heeca/service";
 import { RegisterForm } from "./register-form";
 
 export const metadata: Metadata = { title: "Criar conta" };
 
 export default function RegisterPage() {
+  // Com o portal ativo, a conta nasce lá (assinatura → provision). O cadastro local fica só para dev.
+  if (platformEnabled()) redirect(portalProductUrl());
   return (
     <div className="card">
       <h2 className="mb-1 text-lg font-semibold">Criar conta</h2>

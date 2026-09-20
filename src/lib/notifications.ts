@@ -2,7 +2,7 @@ import "server-only";
 import type { NotificationType } from "@/generated/prisma/enums";
 import { db } from "./db";
 import { formatDateBR, slotLabelInTz } from "./time";
-import { buildVariables, TEMPLATES, type WhatsAppNotificationType } from "./whatsapp/templates";
+import { buildButtons, buildVariables, TEMPLATES, type WhatsAppNotificationType, type WhatsAppPayload } from "./whatsapp/templates";
 
 /**
  * Enfileira notificações de WhatsApp para um agendamento.
@@ -28,12 +28,15 @@ export async function enqueueAppointmentNotification(
       modality: true,
       confirmationToken: true,
       onlineLink: true,
+      serviceNameSnapshot: true,
       patient: { select: { id: true, name: true, whatsapp: true } },
+      service: { select: { patientInstructions: true } },
       professional: {
         select: {
           displayName: true,
+          slug: true,
           onlinePlatform: true,
-          organization: { select: { timezone: true } },
+          organization: { select: { name: true, timezone: true, type: true } },
           scheduleSettings: { select: { confirmationTimeoutHours: true } },
         },
       },
@@ -41,25 +44,31 @@ export async function enqueueAppointmentNotification(
   });
 
   const tz = a.professional.organization.timezone;
+  const modality = a.modality === "ONLINE" ? "Online" : "Presencial";
   const values: Record<string, string> = {
     patientFirstName: a.patient.name.split(" ")[0] ?? a.patient.name,
     professionalName: a.professional.displayName,
-    modality: a.modality === "ONLINE" ? "Online" : "Presencial",
+    // Templates unificados falam em "estabelecimento": para o autônomo é o próprio nome profissional.
+    establishment: a.professional.organization.type === "CLINIC" ? a.professional.organization.name : a.professional.displayName,
+    // O serviço leva a modalidade — para o paciente de psicologia isso é o dado que importa —
+    // salvo quando o nome do serviço já a traz ("Sessão online").
+    service: new RegExp(`\\b${modality}\\b`, "i").test(a.serviceNameSnapshot) ? a.serviceNameSnapshot : `${a.serviceNameSnapshot} (${modality.toLowerCase()})`,
+    modality,
     date: formatDateBR(a.startsAt, tz),
     time: slotLabelInTz(a.startsAt, tz),
+    when: "amanhã",
+    // Orientações administrativas do serviço (nunca clínicas); a Meta não aceita parâmetro vazio → " ".
+    instructions: instructionsParam(a.service.patientInstructions),
     platform: PLATFORM_LABEL[a.professional.onlinePlatform ?? "OTHER"],
     holdHours: String(a.professional.scheduleSettings?.confirmationTimeoutHours ?? 24),
   };
 
   const spec = TEMPLATES[type];
-  const payload: { bodyVariables: string[]; buttonUrlSuffixes?: Array<{ index: number; suffix: string }> } = {
+  const payload: WhatsAppPayload = {
     bodyVariables: buildVariables(type, values),
+    // Sufixos/payloads dos botões: sempre o token (não adivinhável) ou o slug público, nunca o id.
+    buttons: buildButtons(type, { confirmationToken: a.confirmationToken, professionalSlug: a.professional.slug }),
   };
-  if (spec.urlButton) {
-    // Sufixo da URL dinâmica: sempre o token (não adivinhável), nunca o id.
-    if (!a.confirmationToken) throw new Error(`Agendamento ${a.id} sem token para botão de URL`);
-    payload.buttonUrlSuffixes = [{ index: spec.urlButton.index, suffix: a.confirmationToken }];
-  }
 
   return db.notification.create({
     data: {
@@ -74,6 +83,14 @@ export async function enqueueAppointmentNotification(
       scheduledFor: opts.scheduledFor ?? new Date(),
     },
   });
+}
+
+/** Parâmetro {{6}} do heeca_confirmado: frase curta terminada em espaço, ou " " quando não há orientações. */
+function instructionsParam(text: string | null | undefined): string {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return " ";
+  const cut = t.length > 160 ? t.slice(0, 157).trimEnd() + "…" : t;
+  return /[.!?…]$/.test(cut) ? cut + " " : cut + ". ";
 }
 
 const PLATFORM_LABEL = {
@@ -147,8 +164,8 @@ export async function enqueueFormRequest(requestId: string, token: string) {
           professionalName: r.professional.displayName,
           formTitle: r.titleSnapshot,
         }),
-        buttonUrlSuffixes: [{ index: spec.urlButton!.index, suffix: token }],
-      },
+        buttons: buildButtons(type, { formToken: token }),
+      } satisfies WhatsAppPayload,
     },
   });
 }

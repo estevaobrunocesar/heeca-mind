@@ -36,7 +36,8 @@ openssl rand -hex 24      # CRON_SECRET
 | `STORAGE_DRIVER` | | `local` (default) ou `s3`. |
 | `PRIVATE_STORAGE_DIR` | | Driver local: pasta dos documentos clínicos (blobs cifrados). Default `./storage/private`, fora de `public/`. |
 | `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_PUBLIC_URL` | se s3 | R2: `S3_REGION=auto`, `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`, `S3_PUBLIC_URL` = domínio público do bucket. Chaves levam prefixo `mind/` (bucket pode ser compartilhado entre produtos Heeca). |
-| `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` | para enviar de verdade | Sem elas, mensagens vão para o log. Ver `docs/WHATSAPP.md`. |
+| `HEECA_PLATFORM_SECRET`, `HEECA_PORTAL_URL` | **obrigatório em produção** | Segredo compartilhado com o portal (`Product.provisionSecret` do catálogo `mind`): assina `/api/heeca/provision`, `/api/heeca/entitlement` e o JWT de `/sso/heeca`. Com ele, `/cadastro` redireciona para o portal. |
+| `WHATSAPP_PROVIDER`, `NOTIFY_URL`, `NOTIFY_SECRET`, `NOTIFY_PRODUCT` | para enviar de verdade | `notify` + `https://notify.heeca.com.br` + `NOTIFY_SECRET_MIND` do Notify + `mind`. `console` só loga. Nenhum token da Meta neste app. Ver `docs/WHATSAPP.md`. |
 | `POSTGRES_PASSWORD` | compose | Senha do Postgres do compose. |
 
 A aplicação **valida tudo isso na inicialização** (`src/lib/env.ts`) e se recusa a subir com configuração inválida, listando cada problema.
@@ -84,14 +85,24 @@ Backups: `docker compose -f docker-compose.prod.yml exec db pg_dump -U hecca hee
 
 O seed de desenvolvimento é bloqueado com `NODE_ENV=production`.
 
-## 5. WhatsApp (Meta Cloud API)
+## 5. Plataforma Heeca (portal e Notify)
 
-Resumo — detalhes e textos dos templates em `docs/WHATSAPP.md`:
+O Mind é um produto do portal heeca.com.br — não vende, não cobra e não fala com a Meta (docs/mind/00-DECISAO-E-REUSO.md). O que o **chat da plataforma** faz ao colocar o Mind na prateleira, na ordem:
 
-1. App Meta com WhatsApp → número → `WHATSAPP_PHONE_NUMBER_ID`; System User com token permanente → `WHATSAPP_ACCESS_TOKEN`.
-2. Cadastre os 7 templates (categoria Utility, pt_BR) com os nomes exatos de `src/lib/whatsapp/templates.ts`. Base dos botões de URL: `NEXT_PUBLIC_APP_URL`.
-3. Webhook: URL `https://<app>/api/webhooks/whatsapp`, verify token = `WHATSAPP_VERIFY_TOKEN`, assine `messages`. App Secret → `WHATSAPP_APP_SECRET`.
-4. Reinicie a aplicação. Em **Mensagens** os envios passam de "log" para status reais (enviada/entregue/lida).
+1. Catálogo: `Product` `mind` com `provisionUrl = https://mind.heeca.com.br/api/heeca` e `provisionSecret` = `HEECA_PLATFORM_SECRET` deste app (`PRODUCT_MIND_*` no env do portal).
+2. Notify: `NOTIFY_SECRET_MIND` no Notify = `NOTIFY_SECRET` daqui; `mind` na lista de produtos do `validateTemplate`; templates `heeca_mind_*` de `src/lib/whatsapp/templates.ts` no catálogo e na Meta (base de URL = `NEXT_PUBLIC_APP_URL`).
+3. Portal: redirecionador `/a/mind/<slug>` → `https://mind.heeca.com.br/agendar/<slug>` (botão dos templates unificados).
+4. R2: bucket `heeca-mind` (privado) + token → `STORAGE_DRIVER=s3`, `S3_*`.
+5. Coolify: app `heeca-mind` + `heeca-mind-db`, variáveis acima, cron `/api/cron`, DNS `mind.heeca.com.br`, monitor.
+
+Validação sem o portal, em qualquer ambiente (`npm run heeca:sim`, assina como o portal/Notify com os segredos do `.env`):
+
+```bash
+npm run heeca:sim -- provision bruno@exemplo.com          # 200 + tenantId; repetir devolve o mesmo tenant
+npm run heeca:sim -- entitlement sub_sim_bruno_exemplo_com blocked   # app inteiro cai em /bloqueado
+npm run heeca:sim -- sso sub_sim_bruno_exemplo_com bruno@exemplo.com  # abre a URL impressa; segunda vez = token já utilizado
+npm run heeca:sim -- notify button +5511999990000 confirm:<token>     # confirma a sessão como um clique no WhatsApp
+```
 
 ## 6. Checklist antes de abrir para pacientes
 

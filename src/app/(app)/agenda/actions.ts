@@ -4,6 +4,8 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canTransition, targetStatus, type AppointmentAction } from "@/lib/appointment-status";
+import { autoLinkPackage, consumeIfDue } from "@/lib/packages/service";
+import { scheduleSurveyForAppointment } from "@/lib/reports/service";
 import { audit } from "@/lib/audit";
 import { addDaysCivil, findHardConflicts, weekdayOfCivilDate } from "@/lib/availability";
 import { ACTIVE_STATUSES } from "@/lib/availability-data";
@@ -188,6 +190,7 @@ export async function createAppointmentAction(_prev: FormState, formData: FormDa
 
   for (const id of created) {
     await audit(actor, { organizationId: actor.organizationId, action: "appointment.create", entityType: "Appointment", entityId: id });
+    await autoLinkPackage(id); // um único pacote ativo que cobre a sessão → vincula sozinho
     const a = await db.appointment.findUniqueOrThrow({ where: { id }, select: { startsAt: true } });
     await scheduleReminder(id, a.startsAt);
   }
@@ -220,6 +223,7 @@ async function transition(appointmentId: string, action: AppointmentAction, extr
     after: { status: after.status, ...extra },
   });
   await syncWaitlistForAppointment(appointmentId); // oferta da lista de espera, se houver
+  await consumeIfDue(db, appointmentId); // pacote: concluída consome; falta conforme política (D2)
   revalidatePath("/agenda");
   revalidatePath(`/agenda/${appointmentId}`);
   return { before, after };
@@ -238,8 +242,15 @@ export async function requestConfirmationAction(appointmentId: string) {
   await enqueueAppointmentNotification(appointmentId, "BOOKING_REQUEST");
 }
 
+export async function startAppointmentAction(appointmentId: string) {
+  await transition(appointmentId, "start");
+}
+
 export async function completeAppointmentAction(appointmentId: string) {
-  await transition(appointmentId, "complete", { completedAt: new Date() });
+  const { after } = await transition(appointmentId, "complete", { completedAt: new Date() });
+  // Base da reativação (§28): a última sessão concluída fica na ficha, sem varrer a agenda.
+  await db.patient.updateMany({ where: { id: after.patientId, OR: [{ lastCompletedAt: null }, { lastCompletedAt: { lt: after.startsAt } }] }, data: { lastCompletedAt: after.startsAt } });
+  await scheduleSurveyForAppointment(after.id); // §29: pesquisa administrativa 24 h depois, se o profissional ativou
 }
 
 export async function noShowAppointmentAction(appointmentId: string) {

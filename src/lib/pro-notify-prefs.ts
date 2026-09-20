@@ -14,6 +14,7 @@ export const PRO_EVENTS = [
   "WAITLIST_JOINED",
   "WAITLIST_OFFER_ANSWERED",
   "DELEGATION_RECEIVED",
+  "DOCUMENT_ACCEPTED",
 ] as const;
 export type ProEvent = (typeof PRO_EVENTS)[number];
 
@@ -26,6 +27,7 @@ export const PRO_EVENT_LABEL: Record<ProEvent, { title: string; hint: string }> 
   WAITLIST_JOINED: { title: "Entrada na lista de espera", hint: "Alguém entrou pela página pública." },
   WAITLIST_OFFER_ANSWERED: { title: "Resposta a oferta de horário", hint: "Aceitou ou recusou um horário da lista de espera." },
   DELEGATION_RECEIVED: { title: "Delegação recebida", hint: "Um colega delegou um prontuário a você (supervisão/substituição)." },
+  DOCUMENT_ACCEPTED: { title: "Documento aceito", hint: "Paciente leu e aceitou um termo, contrato ou política." },
 };
 
 export type ProNotifyPrefs = { enabled: boolean; events: Record<ProEvent, boolean> };

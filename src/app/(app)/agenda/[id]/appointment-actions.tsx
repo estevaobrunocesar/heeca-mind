@@ -9,6 +9,7 @@ import {
   cancelAppointmentAction,
   completeAppointmentAction,
   confirmAppointmentAction,
+  startAppointmentAction,
   noShowAppointmentAction,
   requestConfirmationAction,
   rescheduleAppointmentAction,
@@ -35,6 +36,7 @@ export function StatusActions({ id, status, inSeries }: { id: string; status: Ap
       <div className="flex flex-wrap gap-2">
         {btn("confirm", "Confirmar", () => confirmAppointmentAction(id), "btn-primary")}
         {btn("request_confirmation", "Pedir confirmação por WhatsApp", () => requestConfirmationAction(id))}
+        {btn("start", "Iniciar atendimento", () => startAppointmentAction(id))}
         {btn("complete", "Marcar como concluída", () => completeAppointmentAction(id))}
         {btn("no_show", "Não compareceu", () => noShowAppointmentAction(id))}
         {actions.has("reschedule") && (

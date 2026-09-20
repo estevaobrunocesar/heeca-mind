@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { registrationField } from "./registration";
 
 const email = z
   .string()
@@ -11,19 +12,11 @@ const password = z
   .min(8, "A senha deve ter pelo menos 8 caracteres")
   .max(128, "Senha muito longa");
 
-// CRP: "06/123456" ou "06123456" — 2 digitos de regiao + numero. Normalizamos
-// para o formato com barra.
-const crp = z
-  .string()
-  .trim()
-  .transform((v) => v.replace(/\D/g, ""))
-  .refine((v) => v.length >= 6 && v.length <= 8, "CRP invalido")
-  .transform((v) => `${v.slice(0, 2)}/${v.slice(2)}`);
-
 export const registerSchema = z.object({
   fullName: z.string().trim().min(3, "Informe seu nome completo").max(120),
   displayName: z.string().trim().min(2, "Informe como quer ser chamado(a)").max(60),
-  crp,
+  // Cadastro local é sempre Psicologia; outros segmentos chegam pelo provisionamento do portal.
+  registrationNumber: registrationField("CRP"),
   email,
   password,
 });

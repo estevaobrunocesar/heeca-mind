@@ -9,7 +9,7 @@ import { formValues, invalid, type FormState } from "@/lib/form";
 import { canManageMembers } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { revokeAllSessions } from "@/lib/sessions";
-import { clinicSchema, inviteSchema } from "@/lib/validation/team";
+import { inviteSchema, ROLE_LABEL } from "@/lib/validation/team";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -17,24 +17,6 @@ async function owner() {
   const actor = await requireActor();
   if (!canManageMembers(actor)) throw new Error("Só o responsável gerencia a equipe");
   return actor;
-}
-
-export async function updateClinicAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const actor = await owner();
-  const parsed = clinicSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return invalid(parsed.error, formData);
-  const { name, slug } = parsed.data;
-
-  if (slug) {
-    const taken = await db.organization.findFirst({ where: { slug, id: { not: actor.organizationId } }, select: { id: true } });
-    if (taken) return { fieldErrors: { slug: ["Este endereço já está em uso"] }, values: formValues(formData) };
-  }
-  const before = await db.organization.findUniqueOrThrow({ where: { id: actor.organizationId }, select: { name: true, slug: true, type: true } });
-  const after = await db.organization.update({ where: { id: actor.organizationId }, data: { name, slug, type: "CLINIC" } });
-  await audit(actor, { organizationId: actor.organizationId, action: "organization.update", entityType: "Organization", entityId: actor.organizationId, before, after: { name: after.name, slug: after.slug, type: after.type } });
-  revalidatePath("/configuracoes/equipe");
-  revalidatePath("/", "layout");
-  return { ok: true };
 }
 
 export async function inviteMemberAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -66,9 +48,9 @@ export async function inviteMemberAction(_prev: FormState, formData: FormData): 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   await sendEmail({
     to: email,
-    subject: `Convite para ${org.name} — Hecca Psico`,
+    subject: `Convite para ${org.name} — Heeca Mind`,
     text:
-      `Você foi convidado(a) para fazer parte de ${org.name} no Hecca Psico como ${role === "PROFESSIONAL" ? "psicólogo(a)" : "recepção"}.\n\n` +
+      `Você foi convidado(a) para fazer parte de ${org.name} no Heeca Mind como ${ROLE_LABEL[role].toLowerCase()}.\n\n` +
       `Aceite o convite (válido por 7 dias):\n${base}/convite/${token}\n`,
   });
 
@@ -86,7 +68,7 @@ export async function cancelInviteAction(invitationId: string) {
   revalidatePath("/configuracoes/equipe");
 }
 
-export async function changeRoleAction(membershipId: string, role: "PROFESSIONAL" | "RECEPTIONIST" | "OWNER") {
+export async function changeRoleAction(membershipId: string, role: "PROFESSIONAL" | "RECEPTIONIST" | "FINANCE" | "OWNER") {
   const actor = await owner();
   const m = await db.membership.findFirst({ where: { id: membershipId, organizationId: actor.organizationId }, include: { user: { select: { professional: { select: { id: true } } } } } });
   if (!m) return;

@@ -17,12 +17,12 @@ export function AcceptForm({ token, isProfessional }: { token: string; isProfess
       {isProfessional ? (
         <>
           <Field label="Nome profissional" name="displayName" placeholder="Ex.: Dr. Carlos" hint="Como aparecerá para os pacientes." defaultValue={v?.displayName} errors={fe?.displayName} />
-          <Field label="CRP" name="crp" placeholder="06/123456" defaultValue={v?.crp} errors={fe?.crp} />
+          <Field label="CRP" name="registrationNumber" placeholder="06/123456" defaultValue={v?.registrationNumber} errors={fe?.registrationNumber} />
         </>
       ) : (
         <>
           <input type="hidden" name="displayName" value="" />
-          <input type="hidden" name="crp" value="" />
+          <input type="hidden" name="registrationNumber" value="" />
         </>
       )}
       <Field label="Crie uma senha" name="password" type="password" autoComplete="new-password" hint="Mínimo de 8 caracteres." errors={fe?.password} />

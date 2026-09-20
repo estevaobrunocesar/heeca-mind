@@ -33,3 +33,14 @@ export function replyTextFrom(m: {
 }): string {
   return m.text?.body ?? m.button?.payload ?? m.button?.text ?? m.interactive?.button_reply?.id ?? m.interactive?.button_reply?.title ?? "";
 }
+
+export type ButtonIntent = "confirm" | "reschedule" | "cancel";
+
+/**
+ * Payload dos botões quick_reply dos templates (`<intenção>:<token>`, ver templates.ts).
+ * Texto livre ou botão sem token → null; o chamador cai no parseReply por telefone.
+ */
+export function parseButtonPayload(id: string): { intent: ButtonIntent; token: string } | null {
+  const m = /^(confirm|reschedule|cancel):([A-Za-z0-9_-]{16,})$/.exec(id.trim());
+  return m ? { intent: m[1] as ButtonIntent, token: m[2] } : null;
+}

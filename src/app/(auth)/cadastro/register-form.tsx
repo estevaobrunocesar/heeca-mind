@@ -20,7 +20,7 @@ export function RegisterForm() {
         defaultValue={v?.displayName}
         errors={fe?.displayName}
       />
-      <Field label="CRP" name="crp" placeholder="06/123456" defaultValue={v?.crp} errors={fe?.crp} />
+      <Field label="CRP" name="registrationNumber" placeholder="06/123456" defaultValue={v?.registrationNumber} errors={fe?.registrationNumber} />
       <Field label="E-mail" name="email" type="email" autoComplete="email" defaultValue={v?.email} errors={fe?.email} />
       <Field
         label="Senha"

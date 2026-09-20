@@ -23,14 +23,14 @@ describe("checkbox ausente (desmarcado)", () => {
     assert.equal(r.data.newPatientWhatsapp, "+5511977771234");
   });
 
-  it("profileSchema: showCrp/showPrices ausentes viram false", () => {
+  it("profileSchema: showRegistration/showPrices ausentes viram false", () => {
     const r = profileSchema.safeParse({
-      displayName: "Dra. Ana", fullName: "Ana Lúcia", crp: "06/123456", photoUrl: "", bio: "", approaches: "", specialties: "",
+      displayName: "Dra. Ana", fullName: "Ana Lúcia", registrationNumber: "06/123456", photoUrl: "", bio: "", approaches: "", specialties: "",
       phone: "", whatsapp: "", email: "", instagram: "", website: "", addressLine: "", addressCity: "", addressState: "", addressZip: "",
       slug: "dra-ana", onlinePlatform: "", onlineFixedLink: "",
     });
     assert.ok(r.success, JSON.stringify(r.error?.issues));
-    assert.equal(r.data.showCrp, false);
+    assert.equal(r.data.showRegistration, false);
     assert.equal(r.data.showPrices, false);
   });
 

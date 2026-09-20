@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Ordem do menu do briefing (docs/mind, §39). Pacotes, Documentos e Relatórios
+// entram aqui nas etapas 3, 4 e 7 do plano; "Clínico" continua fora deste menu
+// (só para quem canOpenClinicalRecord, dentro da ficha do paciente).
 export const NAV = [
-  { href: "/dashboard", label: "Início" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/agenda", label: "Agenda" },
   { href: "/pacientes", label: "Pacientes" },
   { href: "/servicos", label: "Serviços" },
-  { href: "/mensagens", label: "Mensagens" },
+  { href: "/pacotes", label: "Pacotes" },
   { href: "/financeiro", label: "Financeiro" },
+  { href: "/relatorios", label: "Relatórios" },
+  { href: "/mensagens", label: "Mensagens" },
   { href: "/configuracoes", label: "Configurações" },
 ] as const;
 
@@ -22,7 +27,7 @@ export function Sidebar({ userName, publicUrl, orgName, hideFinance = false }: {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-sm font-semibold text-primary">
           H
         </div>
-        <span className="font-semibold tracking-tight">Hecca Psico</span>
+        <span className="font-semibold tracking-tight">Heeca Mind</span>
       </div>
       {orgName && <p className="-mt-3 truncate px-5 pb-3 text-xs text-text-muted">{orgName}</p>}
       <nav className="flex-1 space-y-1 px-3">

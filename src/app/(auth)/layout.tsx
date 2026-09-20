@@ -6,7 +6,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
             <span className="text-xl font-semibold">H</span>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Hecca Psico</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Heeca Mind</h1>
           <p className="mt-1 text-sm text-text-muted">Agenda e agendamento para psicólogos</p>
         </div>
         {children}

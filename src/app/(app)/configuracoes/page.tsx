@@ -22,8 +22,9 @@ export default async function ProfileSettingsPage() {
     select: {
       displayName: true,
       fullName: true,
-      crp: true,
-      showCrp: true,
+      registrationKind: true,
+      registrationNumber: true,
+      showRegistration: true,
       photoUrl: true,
       bio: true,
       approaches: true,

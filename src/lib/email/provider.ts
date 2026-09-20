@@ -15,5 +15,5 @@ export interface EmailProvider {
 }
 
 export function emailFrom(): string {
-  return process.env.EMAIL_FROM || "Hecca Psico <no-reply@localhost>";
+  return process.env.EMAIL_FROM || "Heeca Mind <no-reply@localhost>";
 }

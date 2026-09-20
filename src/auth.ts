@@ -6,6 +6,7 @@ import { z } from "zod";
 import { authConfig } from "./auth.config";
 import { db } from "./lib/db";
 import { createUserSession } from "./lib/sessions";
+import { resolveSsoUser } from "./lib/heeca/service";
 
 const credentialsSchema = z.object({
   email: z.string().email().transform((v) => v.trim().toLowerCase()),
@@ -36,6 +37,28 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     },
   },
   providers: [
+    /**
+     * SSO da conta Heeca: o portal emite um JWT de 60 s e /sso/heeca o entrega aqui.
+     * Passa pelo mesmo callback jwt, cria a mesma user_sessions e respeita o MFA local —
+     * é um login como qualquer outro, só que com o portal atestando o e-mail.
+     */
+    Credentials({
+      id: "heeca-sso",
+      credentials: { token: {} },
+      async authorize(raw, request) {
+        const token = typeof raw?.token === "string" ? raw.token : "";
+        if (!token) return null;
+        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+        const userAgent = request.headers.get("user-agent") ?? null;
+        const r = await resolveSsoUser(token);
+        await db.accessLog.create({ data: { userId: r.ok ? r.user.id : null, email: r.ok ? r.user.email : "sso", success: r.ok, ip, userAgent } });
+        if (!r.ok) return null;
+        await db.user.update({ where: { id: r.user.id }, data: { lastLoginAt: new Date() } });
+        const sid = randomUUID();
+        await createUserSession({ sid, userId: r.user.id, ip, userAgent });
+        return { id: r.user.id, email: r.user.email, name: r.user.name, organizationId: r.user.organizationId, role: r.user.role, professionalId: r.user.professionalId, sid, mfaPending: r.user.mfaEnabled };
+      },
+    }),
     Credentials({
       credentials: { email: {}, password: {} },
       async authorize(raw, request) {

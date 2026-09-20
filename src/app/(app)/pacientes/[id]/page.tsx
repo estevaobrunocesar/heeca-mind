@@ -11,12 +11,17 @@ import { canOpenClinicalRecord } from "@/lib/clinical";
 import { requireActor } from "@/lib/session";
 import { formatDateTimeBR } from "@/lib/time";
 import { FOLLOW_UP_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
+import { describeCommsPrefs, parseCommsPrefs } from "@/lib/comms-prefs";
 import { PatientDangerZone } from "./danger-zone";
 import { anonymizationDueAt } from "@/lib/lgpd/retention";
 import { formatDateBR } from "@/lib/time";
 import { canManageSchedule } from "@/lib/permissions";
 import { listRequestsForPatient } from "@/lib/forms";
 import { FormsPanel } from "./formularios/forms-panel";
+import { listPurchasesForPatient } from "@/lib/packages/service";
+import { PackagesPanel } from "./pacotes/packages-panel";
+import { DocumentsPanel } from "./documentos/documents-panel";
+import { listDocumentsForPatient } from "@/lib/documents/service";
 
 export const metadata: Metadata = { title: "Paciente" };
 
@@ -71,23 +76,34 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
         },
       },
       recurringSeries: { where: { isActive: true }, select: { id: true, frequency: true, weekday: true, startTime: true } },
+      tags: { select: { tag: { select: { id: true, name: true } } }, orderBy: { tag: { name: "asc" } } },
     },
   });
   if (!p) notFound();
+  const address = [p.addressLine, [p.addressCity, p.addressState].filter(Boolean).join("/"), p.addressZip ? p.addressZip.replace(/^(\d{5})(\d{3})$/, "$1-$2") : null].filter(Boolean).join(" · ");
 
   const tz = p.organization.timezone;
   const now = new Date();
+  const age = p.birthDate ? Math.floor((now.getTime() - p.birthDate.getTime()) / (365.25 * 86_400_000)) : null;
   const completed = p.appointments.filter((a) => a.status === "COMPLETED").length;
   const noShow = p.appointments.filter((a) => a.status === "NO_SHOW").length;
   const cancelled = p.appointments.filter((a) => a.status.startsWith("CANCELLED")).length;
   const attendance = completed + noShow > 0 ? Math.round((completed / (completed + noShow)) * 100) : null;
   const upcoming = p.appointments.filter((a) => a.startsAt > now && ACTIVE_STATUSES.includes(a.status as (typeof ACTIVE_STATUSES)[number])).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const pendingPayment = p.appointments.filter((a) => a.status === "COMPLETED" && a.paymentStatus === "PENDING").reduce((s, a) => s + a.priceCents, 0);
+  const purchases = await listPurchasesForPatient(actor, p.id);
   const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const showMoney = canViewAnyFinancials(actor);
   const canOpenRecord = !p.anonymizedAt && (await canOpenClinicalRecord(actor, p.id));
   const formsPro = actor.activeProfessionalId;
   const canSendForms = !!formsPro && !p.deletedAt && !p.anonymizedAt && canManageSchedule(actor, formsPro);
+  const catalog = actor.activeProfessionalId
+    ? (await db.package.findMany({ where: { professionalId: actor.activeProfessionalId, isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, sessionsCount: true, priceCents: true, validityDays: true } })).map((k) => ({ ...k }))
+    : [];
+  const [documentRows, documentTemplates] = await Promise.all([
+    listDocumentsForPatient(actor, p.id),
+    canSendForms ? db.documentTemplate.findMany({ where: { professionalId: formsPro!, isActive: true }, orderBy: { title: "asc" }, select: { id: true, title: true, kind: true, version: true } }) : Promise.resolve([]),
+  ]);
   const [formRequests, formTemplates] = await Promise.all([
     listRequestsForPatient(actor, p.id),
     canSendForms ? db.formTemplate.findMany({ where: { professionalId: formsPro!, isActive: true }, orderBy: { title: "asc" }, select: { id: true, title: true, dataClass: true } }) : Promise.resolve([]),
@@ -190,7 +206,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
                         <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums">
                           {formatBRL(a.priceCents)}
                           <span className={`block text-xs ${a.paymentStatus === "PAID" ? "text-success" : a.paymentStatus === "WAIVED" ? "text-text-muted" : a.status === "COMPLETED" ? "text-warning" : "text-text-muted"}`}>
-                            {a.paymentStatus === "PAID" ? "pago" : a.paymentStatus === "WAIVED" ? "isento" : "pendente"}
+                            {a.paymentStatus === "PAID" ? "pago" : a.paymentStatus === "WAIVED" ? "isento" : a.paymentStatus === "PACKAGE" ? "pacote" : "pendente"}
                           </span>
                         </td>
                         )}
@@ -208,9 +224,25 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
             <h2 className="mb-2 text-base font-semibold">Contato</h2>
             <dl className="divide-y divide-border">
               <Row label="WhatsApp">{p.whatsapp}</Row>
+              {p.phone && <Row label="Telefone">{p.phone}</Row>}
               {p.email && <Row label="E-mail">{p.email}</Row>}
+              {p.birthDate && <Row label="Nascimento">{formatDateBR(p.birthDate, "UTC")}{age !== null && ` · ${age} anos`}</Row>}
+              {address && <Row label="Endereço">{address}</Row>}
               {p.bestContactTime && <Row label="Melhor horário">{p.bestContactTime}</Row>}
+              {(p.emergencyContactName || p.emergencyContactPhone) && (
+                <Row label="Emergência">{[p.emergencyContactName, p.emergencyContactPhone].filter(Boolean).join(" · ")}</Row>
+              )}
+              <Row label="Comunicação">{describeCommsPrefs(parseCommsPrefs(p.commsPrefs))}</Row>
             </dl>
+            {p.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {p.tags.map(({ tag }) => (
+                  <Link key={tag.id} href={`/pacientes?tag=${encodeURIComponent(tag.name)}`} className="rounded-md bg-primary-soft px-2 py-0.5 text-xs text-primary hover:underline">
+                    {tag.name}
+                  </Link>
+                ))}
+              </div>
+            )}
             {!p.anonymizedAt && <a href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn-ghost mt-3 w-full">
               Abrir WhatsApp ↗
             </a>}
@@ -236,6 +268,22 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
               </div>
             )}
           </section>
+
+          <PackagesPanel
+            patientId={p.id}
+            canSell={!p.deletedAt && !p.anonymizedAt && !!actor.activeProfessionalId && canManageSchedule(actor, actor.activeProfessionalId)}
+            showMoney={showMoney}
+            tz={tz}
+            purchases={purchases.map((x) => ({ id: x.id, name: x.nameSnapshot, professional: x.professional.displayName, total: x.sessionsTotal, balance: x.balance, status: x.effective, expiresAt: x.expiresAt.toISOString(), priceCents: x.priceCents, paidCents: x.paidCents, paymentStatus: x.paymentStatus }))}
+            catalog={catalog}
+          />
+
+          <DocumentsPanel
+            patientId={p.id}
+            canSend={canSendForms}
+            templates={documentTemplates}
+            rows={documentRows.map((r) => ({ id: r.id, kind: r.kind, title: r.titleSnapshot, version: r.templateVersion, status: r.status, sentAt: r.sentAt.toISOString(), acceptedAt: r.acceptedAt?.toISOString() ?? null, expiresAt: r.expiresAt.toISOString(), professional: r.professional.displayName }))}
+          />
 
           <section className="card">
             <h2 className="mb-1 text-base font-semibold">Prontuário</h2>

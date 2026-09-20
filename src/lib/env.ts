@@ -30,10 +30,13 @@ const schema = z
     EMAIL_FROM: z.string().optional(),
     SMTP_URL: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
-    WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
-    WHATSAPP_ACCESS_TOKEN: z.string().optional(),
-    WHATSAPP_VERIFY_TOKEN: z.string().optional(),
-    WHATSAPP_APP_SECRET: z.string().optional(),
+    // Plataforma Heeca (docs/mind/00-DECISAO-E-REUSO.md §4)
+    HEECA_PLATFORM_SECRET: z.string().optional(),
+    HEECA_PORTAL_URL: z.string().url().optional(),
+    WHATSAPP_PROVIDER: z.enum(["console", "notify"]).default("console"),
+    NOTIFY_URL: z.string().url().optional(),
+    NOTIFY_SECRET: z.string().optional(),
+    NOTIFY_PRODUCT: z.string().default("mind"),
   })
   .superRefine((e, ctx) => {
     const prod = e.NODE_ENV === "production";
@@ -47,17 +50,16 @@ const schema = z
     }
     if (e.EMAIL_DRIVER === "smtp") need(!!e.SMTP_URL && /^smtps?:\/\//.test(e.SMTP_URL), "SMTP_URL", "EMAIL_DRIVER=smtp exige SMTP_URL (smtp://usuario:senha@host:porta ou smtps://…)");
     if (e.EMAIL_DRIVER === "resend") need(!!e.RESEND_API_KEY, "RESEND_API_KEY", "EMAIL_DRIVER=resend exige RESEND_API_KEY");
-    if (e.EMAIL_DRIVER !== "console") need(!!e.EMAIL_FROM && e.EMAIL_FROM.includes("@"), "EMAIL_FROM", "defina o remetente, ex.: Hecca Psico <no-reply@seudominio.com.br>");
+    if (e.EMAIL_DRIVER !== "console") need(!!e.EMAIL_FROM && e.EMAIL_FROM.includes("@"), "EMAIL_FROM", "defina o remetente, ex.: Heeca Mind <no-reply@seudominio.com.br>");
     if (e.STORAGE_DRIVER === "s3") {
       need(!!e.S3_BUCKET && !!e.S3_ACCESS_KEY_ID && !!e.S3_SECRET_ACCESS_KEY, "S3_BUCKET", "STORAGE_DRIVER=s3 exige S3_BUCKET, S3_ACCESS_KEY_ID e S3_SECRET_ACCESS_KEY");
     }
-    const wa = [e.WHATSAPP_PHONE_NUMBER_ID, e.WHATSAPP_ACCESS_TOKEN];
-    if (wa.some(Boolean) && !wa.every(Boolean)) {
-      ctx.addIssue({ code: "custom", path: ["WHATSAPP_ACCESS_TOKEN"], message: "WHATSAPP_PHONE_NUMBER_ID e WHATSAPP_ACCESS_TOKEN andam juntos" });
+    if (e.WHATSAPP_PROVIDER === "notify") {
+      need(!!e.NOTIFY_URL, "NOTIFY_URL", "WHATSAPP_PROVIDER=notify exige NOTIFY_URL (https://notify.heeca.com.br)");
+      need(!!e.NOTIFY_SECRET && e.NOTIFY_SECRET.length >= 16, "NOTIFY_SECRET", "WHATSAPP_PROVIDER=notify exige NOTIFY_SECRET (= NOTIFY_SECRET_MIND no Notify, ≥ 16)");
     }
-    if (wa.every(Boolean)) {
-      need(!!e.WHATSAPP_APP_SECRET && !!e.WHATSAPP_VERIFY_TOKEN, "WHATSAPP_APP_SECRET", "com a Meta configurada, WHATSAPP_APP_SECRET e WHATSAPP_VERIFY_TOKEN são obrigatórios (webhook)");
-    }
+    if (e.HEECA_PLATFORM_SECRET) need(e.HEECA_PLATFORM_SECRET.length >= 16, "HEECA_PLATFORM_SECRET", "mínimo de 16 caracteres");
+    if (prod) need(!!e.HEECA_PLATFORM_SECRET, "HEECA_PLATFORM_SECRET", "obrigatório em produção (provisionamento e SSO do portal)");
   });
 
 export type Env = z.infer<typeof schema>;
@@ -86,7 +88,8 @@ export function envWarnings(e: Env): string[] {
   const w: string[] = [];
   if (e.ENCRYPTION_KEY_PREVIOUS?.trim()) w.push("Rotação de chave em andamento (ENCRYPTION_KEY_PREVIOUS definida): rode npm run rotate-key até pendentes = 0 e remova a variável.");
   if (e.EMAIL_DRIVER === "console") w.push("E-mail sem provedor (EMAIL_DRIVER=console): redefinição de senha, convites e avisos ao profissional só vão para o log.");
-  if (!e.WHATSAPP_ACCESS_TOKEN) w.push("WhatsApp sem credenciais: mensagens só vão para o log (ConsoleWhatsAppProvider).");
+  if (e.WHATSAPP_PROVIDER !== "notify") w.push("WHATSAPP_PROVIDER=console: mensagens só vão para o log, nada chega ao paciente.");
+  if (!e.HEECA_PLATFORM_SECRET) w.push("HEECA_PLATFORM_SECRET ausente: sem provisionamento/SSO do portal; cadastro local ativo.");
   if (e.STORAGE_DRIVER === "local" && e.NODE_ENV === "production") w.push("STORAGE_DRIVER=local em produção: só funciona com filesystem persistente (VPS/Docker com volume), não em serverless.");
   return w;
 }

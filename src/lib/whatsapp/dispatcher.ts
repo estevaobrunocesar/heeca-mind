@@ -5,15 +5,20 @@ import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleRemi
 import { syncWaitlistForAppointment, syncWaitlistOffers } from "@/lib/waitlist";
 import { autoSendFirstSessionForms, expireFormRequests } from "@/lib/forms";
 import { notifyProfessional } from "@/lib/pro-notify";
-import { getWhatsAppProvider } from "./meta";
+import { getWhatsAppProvider } from "./notify";
 import { getEmailProvider } from "@/lib/email";
 import type { EmailProvider } from "@/lib/email";
 import type { WhatsAppProvider } from "./provider";
-import { parseReply, replyTextFrom } from "./replies";
+import { parseButtonPayload, parseReply, replyTextFrom, type ButtonIntent } from "./replies";
+import { renderReference, templateTypeByName, type WhatsAppPayload } from "./templates";
+import type { MessageEvent, StatusEvent } from "./inbound";
 import { purgeRateLimits } from "@/lib/rate-limit";
 import { anonymizeExpiredPatients, purgeOldWebhookEvents } from "@/lib/lgpd/anonymize";
 import { purgeStaleMfaVerifications } from "@/lib/mfa/service";
 import { purgeSessions } from "@/lib/sessions";
+import { expirePurchases } from "@/lib/packages/service";
+import { autoSendRequiredDocuments, expireDocumentRequests } from "@/lib/documents/service";
+import { purgePortal } from "@/lib/portal/service";
 
 /**
  * Rotinas periódicas do WhatsApp. Chamadas pelo cron (src/app/api/cron) a
@@ -32,7 +37,6 @@ function nextRetry(attempts: number): Date {
   return new Date(Date.now() + 2 ** (attempts - 1) * 60_000);
 }
 
-type Payload = { bodyVariables: string[]; buttonUrlSuffixes?: Array<{ index: number; suffix: string }> };
 type EmailPayload = { subject: string; text: string; html?: string };
 
 const NOT_ACTIVE_TYPES = new Set(["REMINDER_24H", "REMINDER_2H", "SESSION_LINK"]);
@@ -61,7 +65,7 @@ export async function dispatchQueued(provider: WhatsAppProvider = getWhatsAppPro
 
     const n = await db.notification.findUniqueOrThrow({
       where: { id },
-      include: { appointment: { select: { status: true } } },
+      include: { appointment: { select: { status: true } }, organization: { select: { name: true } } },
     });
 
     // Lembrete/link de sessão que não está mais ativa: não envia.
@@ -71,21 +75,30 @@ export async function dispatchQueued(provider: WhatsAppProvider = getWhatsAppPro
       continue;
     }
 
-    let res: { ok: true; providerMessageId?: string } | { ok: false; error: string; retryable: boolean };
+    let res: { ok: true; providerMessageId?: string; skipped?: boolean; reason?: string } | { ok: false; error: string; retryable: boolean };
     if (n.channel === "EMAIL") {
       const p = n.payload as EmailPayload;
       res = await email.send({ to: n.recipient, subject: p.subject, text: p.text, html: p.html });
     } else {
-      const payload = n.payload as Payload;
+      const payload = n.payload as WhatsAppPayload;
+      const type = templateTypeByName(n.templateName ?? "");
       res = await provider.sendTemplate({
         to: n.recipient,
         templateName: n.templateName ?? "",
         bodyVariables: payload.bodyVariables,
-        buttonUrlSuffixes: payload.buttonUrlSuffixes,
+        buttons: payload.buttons,
+        body: type ? renderReference(type, payload.bodyVariables) : payload.bodyVariables.join(" · "),
+        tenantId: n.organizationId,
+        tenantName: n.organization.name,
+        ref: n.id,
       });
     }
 
-    if (res.ok) {
+    if (res.ok && res.skipped) {
+      // Opt-out ou cota: o Notify não vai entregar; não é erro nosso nem vale retry.
+      await db.notification.update({ where: { id }, data: { status: "FAILED", error: res.reason ?? "ignorada pelo Notify" } });
+      result.skipped++;
+    } else if (res.ok) {
       await db.notification.update({
         where: { id },
         data: { status: "SENT", sentAt: new Date(), providerMessageId: res.providerMessageId, error: null },
@@ -145,15 +158,6 @@ export async function expirePendingBookings() {
 // Webhook: status de entrega e respostas do paciente
 // ──────────────────────────────────────────────────────────────
 
-type StatusEvent = { id: string; status: string; timestamp?: string; errors?: Array<{ title?: string; message?: string }> };
-type MessageEvent = {
-  id: string;
-  from: string;
-  type: string;
-  text?: { body?: string };
-  button?: { text?: string; payload?: string };
-  interactive?: { button_reply?: { id?: string; title?: string } };
-};
 
 /** Processa eventos brutos ainda não tratados. */
 export async function processWebhookEvents() {
@@ -202,8 +206,10 @@ async function applyStatus(s: StatusEvent) {
 
   // Não regride: READ não volta a DELIVERED se os eventos chegarem fora de ordem.
   const rank = { QUEUED: 0, SENDING: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4 } as const;
-  const current = await db.notification.findUnique({ where: { providerMessageId: s.id }, select: { id: true, status: true } });
+  const current = await db.notification.findUnique({ where: { providerMessageId: s.id }, select: { id: true, status: true, organizationId: true } });
   if (!current) return;
+  // Callback do Notify traz tenantId/ref da mensagem de origem: divergência = evento de outro lugar, ignorar.
+  if ((s.tenantId && s.tenantId !== current.organizationId) || (s.ref && s.ref !== current.id)) return;
   if (m.status !== "FAILED" && rank[current.status] >= rank[m.status]) return;
 
   await db.notification.update({
@@ -219,23 +225,36 @@ async function applyStatus(s: StatusEvent) {
  */
 async function applyReply(m: MessageEvent): Promise<boolean> {
   const text = replyTextFrom(m);
-  const intent = parseReply(text);
-  if (!intent) return false;
-  const isYes = intent === "yes";
-
   const whatsapp = `+${m.from.replace(/\D/g, "")}`;
-  const target = await db.appointment.findFirst({
-    where: {
-      patient: { whatsapp },
-      startsAt: { gt: new Date() },
-      status: isYes ? "AWAITING_CONFIRMATION" : { in: ["AWAITING_CONFIRMATION", "CONFIRMED"] },
-    },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, organizationId: true, startsAt: true, source: true, professional: { select: { scheduleSettings: { select: { minCancelHours: true } } } } },
-  });
-  if (!target) return false;
+  const select = { id: true, organizationId: true, status: true, startsAt: true, source: true, professional: { select: { scheduleSettings: { select: { minCancelHours: true } } } } } as const;
 
-  if (isYes) {
+  // 1) Botão com token (templates.ts): acerta exatamente a sessão da mensagem — e o telefone tem
+  //    que ser o do paciente dela. Protege contra token vazado e contra duas pendentes do mesmo número.
+  const button = parseButtonPayload(text);
+  let intent: ButtonIntent;
+  let target;
+  if (button) {
+    const a = await db.appointment.findFirst({ where: { confirmationToken: button.token, patient: { whatsapp }, startsAt: { gt: new Date() } }, select });
+    if (!a) return false;
+    if (m.tenantId && m.tenantId !== a.organizationId) return false;
+    if (button.intent === "confirm" ? a.status !== "AWAITING_CONFIRMATION" : !["AWAITING_CONFIRMATION", "CONFIRMED"].includes(a.status)) return false;
+    intent = button.intent;
+    target = a;
+  } else {
+    // 2) Texto livre ("sim", "não"): a solicitação mais recente ainda em aberto daquele número.
+    const parsed = parseReply(text);
+    if (!parsed) return false;
+    intent = parsed === "yes" ? "confirm" : "cancel";
+    const a = await db.appointment.findFirst({
+      where: { patient: { whatsapp }, startsAt: { gt: new Date() }, status: intent === "confirm" ? "AWAITING_CONFIRMATION" : { in: ["AWAITING_CONFIRMATION", "CONFIRMED"] } },
+      orderBy: { createdAt: "desc" },
+      select,
+    });
+    if (!a) return false;
+    target = a;
+  }
+
+  if (intent === "confirm") {
     await db.appointment.update({ where: { id: target.id }, data: { status: "CONFIRMED", confirmedAt: new Date() } });
     await audit(null, { organizationId: target.organizationId, action: "appointment.confirm", entityType: "Appointment", entityId: target.id, after: { by: "whatsapp_reply", text } });
     await enqueueAppointmentNotification(target.id, "BOOKING_CONFIRMED");
@@ -246,7 +265,8 @@ async function applyReply(m: MessageEvent): Promise<boolean> {
   }
 
   const minHours = target.professional.scheduleSettings?.minCancelHours ?? 24;
-  if (Date.now() > target.startsAt.getTime() - minHours * 3_600_000) {
+  // "Remarcar" nunca cancela: vira pedido para o profissional decidir. Cancelar fora do prazo idem.
+  if (intent === "reschedule" || Date.now() > target.startsAt.getTime() - minHours * 3_600_000) {
     // Fora do prazo: registra o pedido para o profissional decidir, sem cancelar.
     await db.appointment.update({ where: { id: target.id }, data: { status: "RESCHEDULE_REQUESTED" } });
     await audit(null, { organizationId: target.organizationId, action: "appointment.reschedule_requested", entityType: "Appointment", entityId: target.id, after: { by: "whatsapp_reply", text } });
@@ -276,7 +296,10 @@ export async function runCron() {
   const purgedRateLimits = await purgeRateLimits();
   const lgpd = await anonymizeExpiredPatients();
   const purgedWebhookEvents = await purgeOldWebhookEvents();
+  const packagesExpired = await expirePurchases();
+  const documents = { expired: await expireDocumentRequests(), autoSent: await autoSendRequiredDocuments() };
+  const portal = await purgePortal();
   const purgedMfa = await purgeStaleMfaVerifications();
   const purgedSessions = await purgeSessions();
-  return { webhook, expiry, waitlistSynced, forms, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, purgedMfa, purgedSessions, at: new Date().toISOString() };
+  return { webhook, expiry, waitlistSynced, forms, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, packagesExpired, documents, portal, purgedMfa, purgedSessions, at: new Date().toISOString() };
 }

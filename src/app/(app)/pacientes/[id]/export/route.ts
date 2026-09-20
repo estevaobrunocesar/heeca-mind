@@ -1,5 +1,7 @@
 import { STATUS_LABEL } from "@/lib/appointment-status";
+import { parseCommsPrefs } from "@/lib/comms-prefs";
 import { db } from "@/lib/db";
+import { formatRegistration } from "@/lib/registration";
 import { canDeletePatient } from "@/lib/permissions";
 import { getActor } from "@/lib/session";
 import { formatDateTimeBR } from "@/lib/time";
@@ -24,9 +26,10 @@ export async function GET(_req: Request, ctx: RouteContext<"/pacientes/[id]/expo
       organization: { select: { name: true, timezone: true, retentionYears: true } },
       appointments: {
         orderBy: { startsAt: "asc" },
-        include: { payments: { orderBy: { paidAt: "asc" } }, professional: { select: { displayName: true, crp: true } } },
+        include: { payments: { orderBy: { paidAt: "asc" } }, professional: { select: { displayName: true, registrationKind: true, registrationNumber: true } } },
       },
       notifications: { orderBy: { createdAt: "asc" }, select: { type: true, status: true, channel: true, sentAt: true, deliveredAt: true, readAt: true } },
+      tags: { select: { tag: { select: { name: true } } } },
     },
   });
   if (!p) return new Response("Not found", { status: 404 });
@@ -41,7 +44,14 @@ export async function GET(_req: Request, ctx: RouteContext<"/pacientes/[id]/expo
     titular: {
       nome: p.name,
       whatsapp: p.whatsapp,
+      telefone: p.phone,
       email: p.email,
+      dataNascimento: p.birthDate ? p.birthDate.toISOString().slice(0, 10) : null,
+      endereco: { logradouro: p.addressLine, cidade: p.addressCity, uf: p.addressState, cep: p.addressZip },
+      contatoEmergencia: { nome: p.emergencyContactName, telefone: p.emergencyContactPhone },
+      preferenciasComunicacao: parseCommsPrefs(p.commsPrefs),
+      etiquetas: p.tags.map((t) => t.tag.name),
+      ultimaSessaoConcluidaEm: fmt(p.lastCompletedAt),
       statusAcompanhamento: FOLLOW_UP_LABEL[p.followUpStatus],
       modalidadeHabitual: p.usualModality,
       formaPagamentoHabitual: p.preferredPaymentMethod ? PAYMENT_METHOD_LABEL[p.preferredPaymentMethod] : null,
@@ -58,7 +68,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/pacientes/[id]/expo
       inicio: fmt(a.startsAt),
       fim: fmt(a.endsAt),
       profissional: a.professional.displayName,
-      crp: a.professional.crp,
+      registration: formatRegistration(a.professional, { force: true }),
       atendimento: a.serviceNameSnapshot,
       modalidade: a.modality === "ONLINE" ? "Online" : "Presencial",
       status: STATUS_LABEL[a.status],

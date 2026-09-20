@@ -27,7 +27,7 @@ export async function sendEmail(input: EmailMessage): Promise<void> {
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   await sendEmail({
     to,
-    subject: "Redefinição de senha — Hecca Psico",
+    subject: "Redefinição de senha — Heeca Mind",
     text:
       `Recebemos um pedido para redefinir sua senha.\n\n` +
       `Acesse o link abaixo (válido por 1 hora):\n${resetUrl}\n\n` +

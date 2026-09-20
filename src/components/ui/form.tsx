@@ -13,6 +13,8 @@ export function Field({
   required = true,
   defaultValue,
   inputMode,
+  maxLength,
+  list,
 }: {
   label: string;
   name: string;
@@ -24,6 +26,9 @@ export function Field({
   required?: boolean;
   defaultValue?: string | number | null;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  maxLength?: number;
+  /** id de um <datalist> com sugestões */
+  list?: string;
 }) {
   const id = `field-${name}`;
   const err = errors?.[0];
@@ -42,6 +47,8 @@ export function Field({
         required={required}
         defaultValue={defaultValue ?? undefined}
         inputMode={inputMode}
+        maxLength={maxLength}
+        list={list}
         aria-invalid={!!err}
         aria-describedby={err ? `${id}-error` : hint ? `${id}-hint` : undefined}
       />
@@ -170,19 +177,23 @@ export function Checkbox({
   name,
   defaultChecked,
   hint,
+  value,
 }: {
   label: string;
   name: string;
   defaultChecked?: boolean;
   hint?: string;
+  /** Para grupos (vários checkboxes com o mesmo name): o valor enviado. */
+  value?: string;
 }) {
-  const id = `field-${name}`;
+  const id = value ? `field-${name}-${value}` : `field-${name}`;
   return (
     <div className="flex items-start gap-3">
       <input
         id={id}
         name={name}
         type="checkbox"
+        value={value}
         defaultChecked={defaultChecked}
         className="mt-1 h-4 w-4 rounded border-border accent-primary"
       />

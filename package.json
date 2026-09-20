@@ -1,5 +1,5 @@
 {
-  "name": "hecca_psico",
+  "name": "heeca_mind",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -16,12 +16,13 @@
     "postinstall": "prisma generate",
     "test": "tsx --test tests/**/*.test.ts",
     "cron": "tsx --conditions=react-server scripts/cron.ts",
-    "webhook:sim": "tsx scripts/simulate-webhook.ts",
+    "heeca:sim": "tsx scripts/heeca-sim.ts",
     "check:rate-limit": "tsx --conditions=react-server scripts/rate-limit-check.ts",
     "check:lgpd": "tsx --conditions=react-server scripts/lgpd-check.ts",
+    "check:tenant": "tsx --conditions=react-server scripts/tenant-check.ts",
     "rotate-key": "tsx --conditions=react-server scripts/rotate-key.ts",
     "db:deploy": "prisma migrate deploy",
-    "docker:build": "docker build -t hecca-psico ."
+    "docker:build": "docker build -t heeca-mind ."
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

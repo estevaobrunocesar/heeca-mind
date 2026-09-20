@@ -1,4 +1,4 @@
-// Hecca Psico — schema multi-tenant
+// Heeca Mind — schema multi-tenant
 //
 // Convenções:
 //  - Todo dado de negócio pertence a uma Organization (tenant). Queries devem
@@ -26,12 +26,54 @@ enum OrganizationType {
   CLINIC // clínica com vários profissionais
 }
 
+/// Segmento do tenant (docs/mind/01-ARQUITETURA.md §6). O MVP exibe só PSYCHOLOGY;
+/// decide o tipo de registro profissional padrão (src/lib/registration.ts).
+enum Segment {
+  PSYCHOLOGY
+  THERAPY
+}
+
+/// Espelho de `entitlement.access` do portal: BLOCKED manda o app inteiro para /bloqueado.
+enum AccessState {
+  OK
+  WARNING
+  BLOCKED
+}
+
 model Organization {
   id             String           @id @default(cuid())
   name           String
   type           OrganizationType @default(SOLO)
   slug           String?          @unique // página pública da clínica: /clinica/<slug>
   timezone       String           @default("America/Sao_Paulo")
+  segment        Segment          @default(PSYCHOLOGY)
+
+  // Conta/assinatura no portal heeca.com.br (heeca_site/docs/ENTITLEMENT.md; src/lib/heeca/).
+  // O portal é dono de plano e cobrança; aqui só espelhamos o suficiente para o gate de acesso.
+  heecaSubscriptionId String?     @unique
+  heecaAccountId      String?
+  planCode            String?
+  planFeatures        String[]    @default([])
+  planLimits          Json?
+  accessState         AccessState @default(OK)
+  entitlementSyncedAt DateTime?
+  // Dados da conta vindos do portal (cadastro completo da clínica entra na etapa 2)
+  document            String? // CPF/CNPJ só dígitos
+  contactEmail        String?
+  contactPhone        String?
+  // Cadastro da clínica (§6) — o que aparece em documentos, página pública e mensagens
+  legalName           String?
+  whatsapp            String? // E.164
+  website             String?
+  instagram           String?
+  logoUrl             String?
+  logoKey             String?
+  addressLine         String?
+  addressCity         String?
+  addressState        String?
+  addressZip          String?
+  offersOnline        Boolean     @default(true)
+  offersInPerson      Boolean     @default(true)
   /// Anos de guarda após o último atendimento/exclusão antes de anonimizar (CFP: mínimo 5).
   retentionYears Int              @default(5)
   createdAt      DateTime         @default(now())
@@ -40,6 +82,16 @@ model Organization {
   memberships         Membership[]
   professionals       Professional[]
   patients            Patient[]
+  tags                Tag[]
+  packages            Package[]
+  packagePurchases    PackagePurchase[]
+  documentTemplates   DocumentTemplate[]
+  documentRequests    DocumentRequest[]
+  commissionRules     CommissionRule[]
+  commissionEntries   CommissionEntry[]
+  commissionClosings  CommissionClosing[]
+  experienceSurveys   ExperienceSurvey[]
+  reactivationContacts ReactivationContact[]
   appointments        Appointment[]
   notifications       Notification[]
   auditLogs           AuditLog[]
@@ -56,6 +108,7 @@ enum MembershipRole {
   OWNER // dono da conta / clínica
   PROFESSIONAL // psicólogo
   RECEPTIONIST // secretaria: agenda e contatos, sem acesso clínico
+  FINANCE // financeiro: valores, pagamentos e comissões; agenda e pacientes só leitura; sem acesso clínico
 }
 
 model User {
@@ -195,8 +248,11 @@ model Professional {
   // Identidade profissional
   displayName String // "Dra. Ana"
   fullName    String
-  crp         String // dado profissional — exibido só onde o profissional autorizar
-  showCrp     Boolean  @default(true)
+  // Registro no conselho (CRP, CRN, CRFa…) — src/lib/registration.ts. Nulo quando o
+  // perfil foi criado pelo provisionamento do portal e ainda não foi preenchido.
+  registrationKind   String  @default("CRP")
+  registrationNumber String? // exibido só onde o profissional autorizar
+  showRegistration   Boolean @default(true)
   photoUrl    String? // URL pública (nossa ou externa)
   photoKey    String? // chave no storage quando a foto foi enviada por nós — permite apagar
   bio         String?
@@ -245,6 +301,15 @@ model Professional {
   waitlistEntries             WaitlistEntry[]
   formTemplates               FormTemplate[]
   formRequests                FormRequest[]
+  packages                    Package[]
+  packagePurchases            PackagePurchase[]
+  documentTemplates           DocumentTemplate[]
+  documentRequests            DocumentRequest[]
+  commissionRules             CommissionRule[]
+  commissionEntries           CommissionEntry[]
+  commissionClosings          CommissionClosing[]
+  experienceSurveys           ExperienceSurvey[]
+  reactivationContacts        ReactivationContact[]
 
   @@index([organizationId])
   @@map("professionals")
@@ -310,6 +375,14 @@ model ProfessionalPolicy {
   onlineInstructions String?
   paymentInfo        String?
   terms              String?
+  /// D2: falta (NO_SHOW) consome uma sessão do pacote? Padrão sim — a hora foi reservada.
+  noShowConsumesPackage Boolean @default(true)
+  /// §29: enviar pesquisa administrativa de experiência 24 h após a sessão concluída.
+  surveyEnabled Boolean @default(false)
+  /// §28: paciente ativo sem sessão concluída há N dias aparece na lista de reativação.
+  reactivationAfterDays Int @default(90)
+  /// §28: frase do convite ({{3}} do heeca_retorno). Administrativa, configurável; nunca clínica.
+  reactivationInviteText String?
 
   updatedAt DateTime @updatedAt
 
@@ -396,6 +469,21 @@ model Patient {
   name     String
   whatsapp String // E.164
   email    String?
+  phone    String? // telefone alternativo (fixo, recado)
+  birthDate DateTime? @db.Date
+
+  // Endereço e contato de emergência: administrativos (para recibo e para ligar), nunca clínicos
+  addressLine           String?
+  addressCity           String?
+  addressState          String?
+  addressZip            String?
+  emergencyContactName  String?
+  emergencyContactPhone String? // E.164
+
+  /// Preferências de comunicação (src/lib/comms-prefs.ts): { whatsapp, reminder24h, reminder2h }. null = tudo ligado.
+  commsPrefs Json?
+  /// Última sessão concluída — desnormalizado por transition(complete); base da reativação (§28).
+  lastCompletedAt DateTime?
 
   usualModality          Modality?
   followUpStatus         FollowUpStatus @default(ACTIVE)
@@ -421,9 +509,18 @@ model Patient {
   formRequests        FormRequest[]
   notifications       Notification[]
   receipts            Receipt[]
+  tags                PatientTag[]
+  packagePurchases    PackagePurchase[]
+  documentRequests    DocumentRequest[]
+  portalTokens        PatientAccessToken[]
+  portalSessions      PatientSession[]
+  experienceSurveys   ExperienceSurvey[]
+  reactivationContacts ReactivationContact[]
 
   @@unique([organizationId, whatsapp])
   @@index([organizationId, name])
+  @@index([organizationId, followUpStatus])
+  @@index([organizationId, lastCompletedAt])
   @@map("patients")
 }
 
@@ -431,10 +528,38 @@ model Patient {
 // AGENDAMENTOS
 // ───────────────────────────────────────────────────────────────
 
+/// Etiquetas administrativas do CRM ("convênio X", "indicação", "prefere manhã"). Nunca clínicas.
+model Tag {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patients     PatientTag[]
+
+  @@unique([organizationId, name])
+  @@map("tags")
+}
+
+model PatientTag {
+  patientId String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([patientId, tagId])
+  @@index([tagId])
+  @@map("patient_tags")
+}
+
 enum AppointmentStatus {
   PENDING // solicitado, aguardando ação
   AWAITING_CONFIRMATION // mensagem enviada, aguardando paciente
   CONFIRMED
+  IN_PROGRESS // atendimento em andamento (§9 do briefing)
   CANCELLED_BY_PATIENT
   CANCELLED_BY_PROFESSIONAL
   RESCHEDULE_REQUESTED
@@ -460,6 +585,14 @@ enum PaymentStatus {
   PENDING
   PAID
   WAIVED // isento / cortesia
+  PACKAGE // coberto por um pacote de sessões (a receita é a venda do pacote)
+}
+
+enum PackagePurchaseStatus {
+  ACTIVE
+  EXHAUSTED // todas as sessões consumidas
+  EXPIRED // passou a validade com saldo
+  CANCELLED
 }
 
 enum RecurrenceFrequency {
@@ -528,6 +661,8 @@ model Appointment {
   paymentStatus PaymentStatus  @default(PENDING)
   paymentMethod PaymentMethod?
   paidAt        DateTime?
+  /// Sessão coberta por pacote (paymentStatus = PACKAGE). Consumo efetivo em PackageConsumption.
+  packagePurchaseId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -537,6 +672,10 @@ model Appointment {
   patient           Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
   service           Service            @relation(fields: [serviceId], references: [id])
   series            RecurringSeries?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  packagePurchase   PackagePurchase?   @relation(fields: [packagePurchaseId], references: [id], onDelete: SetNull)
+  packageConsumption PackageConsumption?
+  documentRequests  DocumentRequest[]
+  experienceSurvey  ExperienceSurvey?
   payments          Payment[]
   notifications     Notification[]
   receipt           Receipt?
@@ -552,19 +691,365 @@ model Appointment {
   @@map("appointments")
 }
 
+/// Um recebimento: de uma sessão OU de um pacote (check constraint no SQL: exatamente um dos dois).
+/// "Recebido no mês" = soma por paidAt, independente da origem.
 model Payment {
-  id            String        @id @default(cuid())
-  appointmentId String
-  amountCents   Int
-  method        PaymentMethod
-  paidAt        DateTime      @default(now())
-  note          String?
-  createdAt     DateTime      @default(now())
+  id                String        @id @default(cuid())
+  appointmentId     String?
+  packagePurchaseId String?
+  amountCents       Int
+  method            PaymentMethod
+  paidAt            DateTime      @default(now())
+  note              String?
+  createdAt         DateTime      @default(now())
 
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointment     Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  packagePurchase PackagePurchase? @relation(fields: [packagePurchaseId], references: [id], onDelete: Cascade)
 
   @@index([appointmentId])
+  @@index([packagePurchaseId])
+  @@index([paidAt])
   @@map("payments")
+}
+
+// ───────────────────────────────────────────────────────────────
+// PACOTES DE SESSÕES (§20) — src/lib/packages/
+// ───────────────────────────────────────────────────────────────
+
+/// Catálogo: "Pacote 5 sessões, 90 dias". Pertence ao profissional (D1: serviços e pacotes por profissional).
+model Package {
+  id             String   @id @default(cuid())
+  organizationId String
+  professionalId String
+  name           String
+  description    String?
+  sessionsCount  Int
+  priceCents     Int
+  validityDays   Int
+  /// Serviços que o pacote cobre; vazio = qualquer serviço do profissional.
+  serviceIds     String[] @default([])
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  purchases    PackagePurchase[]
+
+  @@index([organizationId, professionalId, isActive])
+  @@map("packages")
+}
+
+/// Venda a um paciente. Saldo = sessionsTotal − consumos não revertidos (calculado, nunca coluna).
+model PackagePurchase {
+  id             String                @id @default(cuid())
+  organizationId String
+  patientId      String
+  packageId      String
+  professionalId String
+  nameSnapshot   String
+  sessionsTotal  Int
+  priceCents     Int
+  serviceIds     String[]              @default([]) // snapshot da cobertura no momento da venda
+  purchasedAt    DateTime              @default(now())
+  expiresAt      DateTime
+  status         PackagePurchaseStatus @default(ACTIVE)
+  paymentStatus  PaymentStatus         @default(PENDING)
+  cancelledAt    DateTime?
+  cancelReason   String?
+  note           String? // administrativo
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient      Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  package      Package              @relation(fields: [packageId], references: [id])
+  professional Professional         @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+  consumptions PackageConsumption[]
+  appointments Appointment[]
+
+  @@index([organizationId, patientId, status])
+  @@index([expiresAt])
+  @@map("package_purchases")
+}
+
+/// Uma sessão consumida do pacote. Reverter mantém a linha (histórico) com revertedAt.
+// ───────────────────────────────────────────────────────────────
+// DOCUMENTOS ADMINISTRATIVOS E CONSENTIMENTOS (§15) — src/lib/documents/
+// Termos, contratos, políticas, autorizações. Em claro: guardam o que o paciente
+// ACEITOU, não o que disse. Conteúdo clínico continua no prontuário cifrado.
+// ───────────────────────────────────────────────────────────────
+
+enum DocumentKind {
+  CONSENT // termo de consentimento
+  CONTRACT // contrato de prestação de serviços
+  POLICY // política (cancelamento, faltas, pagamento)
+  AUTHORIZATION // autorização (imagem, contato com terceiros…)
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING // enviado, não aberto
+  VIEWED // aberto pelo link
+  ACCEPTED // aceite registrado (nome, instante, IP, hash)
+  EXPIRED // link venceu sem aceite
+  REVOKED // cancelado pelo profissional
+}
+
+/// Modelo por profissional, versionado: salvar com texto/título diferente incrementa `version`.
+/// Instâncias enviadas guardam o texto renderizado (snapshot), então editar o modelo nunca muda o que foi aceito.
+model DocumentTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  professionalId String
+  kind           DocumentKind @default(CONSENT)
+  title          String
+  /// Texto com variáveis {{paciente.nome}}, {{profissional.nome}}… (src/lib/documents/rules.ts).
+  body           String
+  version        Int          @default(1)
+  isActive       Boolean      @default(true)
+  /// Enviar automaticamente quando a primeira sessão do paciente com este profissional for confirmada.
+  requireBeforeFirstSession Boolean @default(false)
+  createdByUserId String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  requests     DocumentRequest[]
+
+  @@index([professionalId, isActive])
+  @@map("document_templates")
+}
+
+/// Um documento enviado a um paciente. Registra data, hora, versão, usuário e status (§15).
+model DocumentRequest {
+  id              String         @id @default(cuid())
+  organizationId  String
+  professionalId  String
+  patientId       String
+  appointmentId   String?
+  templateId      String
+  templateVersion Int
+  kind            DocumentKind
+  titleSnapshot   String
+  /// Texto final que o paciente viu (variáveis já preenchidas). Base do hash.
+  bodySnapshot    String
+  bodyHash        String // sha256 do bodySnapshot canônico
+  tokenHash       String         @unique // token só na mensagem
+  status          DocumentStatus @default(PENDING)
+  sentAt          DateTime       @default(now())
+  viewedAt        DateTime?
+  acceptedAt      DateTime?
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  revokeReason    String?
+  // Prova do aceite (assinatura eletrônica simples). Anonimização: nome/IP/UA zerados, hash mantido (D6).
+  acceptName      String?
+  acceptIp        String?
+  acceptUserAgent String?
+  acceptanceHash  String? // sha256(bodyHash|nome|instante|ip)
+  createdByUserId String? // null = envio automático
+  createdAt       DateTime       @default(now())
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient      Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment  Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  template     DocumentTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([organizationId, patientId, status])
+  @@index([templateId, patientId, status])
+  @@index([status, expiresAt])
+  @@map("document_requests")
+}
+
+// ───────────────────────────────────────────────────────────────
+// PORTAL DO PACIENTE (§17, D4: link mágico por WhatsApp) — src/lib/portal/
+// Sessão própria, separada do Auth.js: o paciente nunca é um User.
+// ───────────────────────────────────────────────────────────────
+
+/// Link mágico: 15 minutos, uso único. Prova a posse do número (a identidade do paciente).
+model PatientAccessToken {
+  id             String    @id @default(cuid())
+  organizationId String
+  patientId      String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  requestIp      String?
+  createdAt      DateTime  @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, expiresAt])
+  @@map("patient_access_tokens")
+}
+
+/// Sessão do portal (cookie hm_patient = sid). 30 dias; revogável pela recepção.
+model PatientSession {
+  id             String    @id @default(cuid())
+  organizationId String
+  patientId      String
+  sid            String    @unique
+  expiresAt      DateTime
+  lastSeenAt     DateTime  @default(now())
+  userAgent      String?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, revokedAt])
+  @@index([expiresAt])
+  @@map("patient_sessions")
+}
+
+// ───────────────────────────────────────────────────────────────
+// COMISSÕES (§25; D3: base = valor recebido) — src/lib/commissions/
+// ───────────────────────────────────────────────────────────────
+
+/// Regra vigente por profissional; com serviceId prevalece sobre a geral. Percentual em basis points
+/// (1250 = 12,5 %) OU valor fixo por sessão — exatamente um dos dois.
+model CommissionRule {
+  id             String    @id @default(cuid())
+  organizationId String
+  professionalId String
+  serviceId      String?
+  percentBp      Int?
+  fixedCents     Int?
+  validFrom      DateTime  @db.Date
+  validTo        DateTime? @db.Date
+  note           String?
+  createdByUserId String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  entries      CommissionEntry[]
+
+  @@index([organizationId, professionalId, validFrom])
+  @@map("commission_rules")
+}
+
+enum CommissionEntryKind {
+  PAYMENT // gerado por um pagamento recebido (sessão ou pacote)
+  REVERSAL // estorno de um pagamento já fechado (linha negativa)
+  ADJUSTMENT // ajuste manual (bônus, desconto)
+}
+
+/// Um lançamento. Gerado no evento do pagamento; nunca editado. Fechado quando closingId != null.
+model CommissionEntry {
+  id                String              @id @default(cuid())
+  organizationId    String
+  professionalId    String
+  kind              CommissionEntryKind @default(PAYMENT)
+  paymentId         String?
+  appointmentId     String?
+  packagePurchaseId String?
+  ruleId            String?
+  baseCents         Int
+  amountCents       Int // pode ser negativo (REVERSAL/ADJUSTMENT)
+  occurredAt        DateTime
+  closingId         String?
+  note              String?
+  createdByUserId   String?
+  createdAt         DateTime            @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional       @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  rule         CommissionRule?    @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  closing      CommissionClosing? @relation(fields: [closingId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, professionalId, occurredAt])
+  @@index([paymentId])
+  @@index([closingId])
+  @@map("commission_entries")
+}
+
+/// Fechamento de período: imutável. Lançamentos depois do fechamento entram no próximo.
+model CommissionClosing {
+  id             String   @id @default(cuid())
+  organizationId String
+  professionalId String
+  periodStart    DateTime @db.Date
+  periodEnd      DateTime @db.Date
+  totalCents     Int
+  entriesCount   Int
+  closedAt       DateTime @default(now())
+  closedByUserId String
+  note           String?
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  entries      CommissionEntry[]
+
+  @@index([organizationId, professionalId, periodEnd])
+  @@map("commission_closings")
+}
+
+// ───────────────────────────────────────────────────────────────
+// PESQUISA DE EXPERIÊNCIA (§29) e REATIVAÇÃO (§28) — administrativas
+// ───────────────────────────────────────────────────────────────
+
+/// "Como foi sua experiência com nosso atendimento?" — nota 0–10 e comentário livre. Não é avaliação clínica
+/// nem pública; só o profissional/dono vê. Uma por sessão concluída; uso único do link.
+model ExperienceSurvey {
+  id             String    @id @default(cuid())
+  organizationId String
+  professionalId String
+  patientId      String
+  appointmentId  String    @unique
+  tokenHash      String    @unique
+  score          Int?
+  comment        String?
+  sentAt         DateTime  @default(now())
+  answeredAt     DateTime?
+  expiresAt      DateTime
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, professionalId, answeredAt])
+  @@map("experience_surveys")
+}
+
+/// Convite de retorno enviado por clique humano (nunca automático). Registro para não repetir e medir.
+model ReactivationContact {
+  id             String   @id @default(cuid())
+  organizationId String
+  professionalId String
+  patientId      String
+  notificationId String?
+  sentAt         DateTime @default(now())
+  byUserId       String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, patientId, sentAt])
+  @@map("reactivation_contacts")
+}
+
+model PackageConsumption {
+  id                String    @id @default(cuid())
+  packagePurchaseId String
+  appointmentId     String    @unique
+  consumedAt        DateTime  @default(now())
+  reason            String // "completed" | "no_show"
+  revertedAt        DateTime?
+  revertReason      String?
+
+  packagePurchase PackagePurchase @relation(fields: [packagePurchaseId], references: [id], onDelete: Cascade)
+  appointment     Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([packagePurchaseId, revertedAt])
+  @@map("package_consumptions")
 }
 
 /// Preparação para emissão de recibos (módulo futuro).
@@ -603,6 +1088,10 @@ enum NotificationType {
   WAITLIST_JOINED // entrou na lista de espera
   WAITLIST_OFFER // surgiu um horário; confirmar pelo link
   FORM_REQUEST // preencher formulário pré-atendimento
+  DOCUMENT_REQUEST // ler e aceitar documento (termo, contrato)
+  PORTAL_LOGIN // link mágico de acesso ao portal do paciente
+  SURVEY // pesquisa de experiência após a sessão (§29)
+  REACTIVATION // convite de retorno (§28), por clique humano
   // Avisos ao PROFISSIONAL (canal EMAIL; payload = { subject, text, html })
   PRO_BOOKING_REQUESTED
   PRO_BOOKING_CONFIRMED
@@ -612,6 +1101,7 @@ enum NotificationType {
   PRO_WAITLIST_JOINED
   PRO_WAITLIST_OFFER_ANSWERED
   PRO_DELEGATION_RECEIVED
+  PRO_DOCUMENT_ACCEPTED
 }
 
 enum NotificationStatus {

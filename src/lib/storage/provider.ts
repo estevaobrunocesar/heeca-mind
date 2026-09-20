@@ -6,11 +6,11 @@ import "server-only";
  * Drivers: `local` (public/uploads — dev e servidores próprios) e `s3`
  * (S3/R2/MinIO — serverless). Escolhido por STORAGE_DRIVER.
  *
- * Todas as chaves levam o prefixo do produto (`hecca-psico/`), para que um
+ * Todas as chaves levam o prefixo do produto (`mind/`), para que um
  * bucket compartilhado entre os produtos Heeca não misture arquivos.
  */
 
-export const KEY_PREFIX = "hecca-psico/";
+export const KEY_PREFIX = "mind/";
 
 export type PutInput = {
   /** Caminho relativo, sem o prefixo do produto. Ex.: "professionals/abc/photo.jpg" */

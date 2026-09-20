@@ -1,6 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
+import { autoLinkPackage } from "@/lib/packages/service";
 import { redirect } from "next/navigation";
 import { isSlotAvailable } from "@/lib/availability";
 import { loadAvailabilityInput } from "@/lib/availability-data";
@@ -150,6 +151,7 @@ export async function createPublicBookingAction(
     entityId: result.appointment.id,
     after: { source: "PUBLIC_PAGE", startsAt },
   });
+  await autoLinkPackage(result.appointment.id); // paciente com um pacote ativo que cobre: já entra coberto
   await enqueueAppointmentNotification(result.appointment.id, "BOOKING_REQUEST");
   await notifyProfessional({ event: "BOOKING_REQUESTED", appointmentId: result.appointment.id });
 

@@ -4,12 +4,14 @@ import { useActionState } from "react";
 import { Checkbox, Field, FormError, FormSuccess, Select, SubmitButton, TextArea } from "@/components/ui/form";
 import type { FormState } from "@/lib/form";
 import { updateProfileAction } from "./actions";
+import { registrationSpec } from "@/lib/registration";
 
 export type ProfileValues = {
   displayName: string;
   fullName: string;
-  crp: string;
-  showCrp: boolean;
+  registrationKind: string;
+  registrationNumber: string | null;
+  showRegistration: boolean;
   bio: string | null;
   approaches: string[];
   specialties: string[];
@@ -47,6 +49,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 }
 
 export function ProfileForm({ profile, publicBaseUrl }: { profile: ProfileValues; publicBaseUrl: string }) {
+  const spec = registrationSpec(profile.registrationKind);
   const [state, action] = useActionState<FormState, FormData>(updateProfileAction, {});
   const fe = state.fieldErrors;
   const v = state.values;
@@ -57,7 +60,7 @@ export function ProfileForm({ profile, publicBaseUrl }: { profile: ProfileValues
     if (Array.isArray(orig)) return orig.join(", ");
     return String(orig);
   };
-  const checked = (k: "showCrp" | "showPrices") => (v ? v[k] === "on" : profile[k]);
+  const checked = (k: "showRegistration" | "showPrices") => (v ? v[k] === "on" : profile[k]);
 
   return (
     <form action={action} className="max-w-3xl space-y-6">
@@ -70,9 +73,9 @@ export function ProfileForm({ profile, publicBaseUrl }: { profile: ProfileValues
           <Field label="Nome completo" name="fullName" defaultValue={val("fullName")} errors={fe?.fullName} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="CRP" name="crp" defaultValue={val("crp")} errors={fe?.crp} />
+          <Field label={spec.fieldLabel} name="registrationNumber" placeholder={spec.placeholder} defaultValue={val("registrationNumber")} errors={fe?.registrationNumber} />
           <div className="pt-7">
-            <Checkbox label="Exibir CRP na página pública" name="showCrp" defaultChecked={checked("showCrp")} />
+            <Checkbox label={`Exibir ${spec.label || "registro"} na página pública`} name="showRegistration" defaultChecked={checked("showRegistration")} />
           </div>
         </div>
         <TextArea

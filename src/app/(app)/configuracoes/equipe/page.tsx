@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { canManageMembers } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { formatDateBR, formatDateTimeBR } from "@/lib/time";
-import { ClinicForm, InviteForm, TeamList } from "./team-panel";
+import Link from "next/link";
+import { InviteForm, TeamList } from "./team-panel";
 
 export const metadata: Metadata = { title: "Equipe" };
 
@@ -24,10 +25,15 @@ export default async function TeamPage() {
     db.invitation.findMany({ where: { organizationId: actor.organizationId, acceptedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" } }),
   ]);
 
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/^https?:\/\//, "");
   return (
     <div className="max-w-3xl space-y-6">
-      <ClinicForm name={org.name} slug={org.slug} publicBaseUrl={base} />
+      <p className="text-sm text-text-muted">
+        Nome, página pública e dados da clínica ficam na aba{" "}
+        <Link href="/configuracoes/clinica" className="text-primary hover:underline">
+          Clínica
+        </Link>
+        .
+      </p>
       <InviteForm />
       <TeamList
         members={memberships.map((m) => ({

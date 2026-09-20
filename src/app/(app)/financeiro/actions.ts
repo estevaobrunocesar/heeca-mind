@@ -10,6 +10,7 @@ import { getAppointmentInTenant } from "@/lib/tenant";
 import { dateTimeInTz } from "@/lib/time";
 import { registerPaymentSchema } from "@/lib/validation/payment";
 import type { PaymentMethod } from "@/generated/prisma/enums";
+import { onPaymentRecorded, onPaymentsReverted } from "@/lib/commissions/service";
 
 async function ctx(appointmentId: string) {
   const actor = await requireActor();
@@ -45,7 +46,7 @@ export async function registerPaymentAction(appointmentId: string, _prev: FormSt
   const total = paidSoFar + amount;
   const settled = total >= appointment.priceCents;
 
-  await db.$transaction([
+  const [payment] = await db.$transaction([
     db.payment.create({ data: { appointmentId, amountCents: amount, method: d.method, paidAt, note: d.note } }),
     db.appointment.update({
       where: { id: appointmentId },
@@ -54,6 +55,7 @@ export async function registerPaymentAction(appointmentId: string, _prev: FormSt
         : { paymentMethod: d.method },
     }),
   ]);
+  await onPaymentRecorded(payment.id); // comissão (D3: sobre o recebido); nunca lança
 
   await audit(actor, {
     organizationId: actor.organizationId,
@@ -90,6 +92,7 @@ export async function waivePaymentAction(appointmentId: string) {
 export async function revertPaymentAction(appointmentId: string) {
   const { actor } = await ctx(appointmentId);
   const payments = await db.payment.findMany({ where: { appointmentId } });
+  await onPaymentsReverted(payments, actor); // antes de apagar: precisa dos ids
   await db.$transaction([
     db.payment.deleteMany({ where: { appointmentId } }),
     db.appointment.update({ where: { id: appointmentId }, data: { paymentStatus: "PENDING", paymentMethod: null, paidAt: null } }),

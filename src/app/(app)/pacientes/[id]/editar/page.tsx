@@ -23,14 +23,30 @@ export default async function EditPatientPage({ params }: PageProps<"/pacientes/
       needsReceipt: true,
       bestContactTime: true,
       adminNotes: true,
+      phone: true,
+      birthDate: true,
+      addressLine: true,
+      addressCity: true,
+      addressState: true,
+      addressZip: true,
+      emergencyContactName: true,
+      emergencyContactPhone: true,
+      commsPrefs: true,
+      tags: { select: { tag: { select: { name: true } } } },
     },
   });
   if (!patient) notFound();
+  const tagSuggestions = (await db.tag.findMany({ where: { organizationId: actor.organizationId }, orderBy: { name: "asc" }, select: { name: true } })).map((t) => t.name);
+  const values = {
+    ...patient,
+    birthDate: patient.birthDate ? patient.birthDate.toISOString().slice(0, 10) : null, // @db.Date: data civil, sem fuso
+    tags: patient.tags.map((t) => t.tag.name),
+  };
 
   return (
     <>
       <PageHeader title={`Editar · ${patient.name}`} />
-      <PatientForm patient={patient} />
+      <PatientForm patient={values} tagSuggestions={tagSuggestions} />
     </>
   );
 }

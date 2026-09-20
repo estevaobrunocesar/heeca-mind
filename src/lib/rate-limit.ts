@@ -117,6 +117,9 @@ export const RULES = {
   loginEmail: { scope: "login:email", limit: 8, windowSeconds: 15 * 60 },
   /** Segundo fator: 6 dígitos são fáceis de chutar; por usuário. */
   mfaVerify: { scope: "mfa:user", limit: 10, windowSeconds: 15 * 60 },
+  /** Portal do paciente: link mágico por telefone (estreito) e por IP (largo). */
+  portalPhone: { scope: "portal:phone", limit: 3, windowSeconds: 60 * 60 },
+  portalIp: { scope: "portal:ip", limit: 20, windowSeconds: 60 * 60 },
   /** Recuperação de senha: evita spam de e-mail. */
   passwordResetIp: { scope: "reset:ip", limit: 5, windowSeconds: 60 * 60 },
 } satisfies Record<string, RateLimitRule>;

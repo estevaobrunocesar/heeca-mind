@@ -24,7 +24,8 @@ export type ProEventInput =
   | { event: "FORM_SUBMITTED"; formRequestId: string }
   | { event: "WAITLIST_JOINED"; waitlistEntryId: string }
   | { event: "WAITLIST_OFFER_ANSWERED"; waitlistEntryId: string; appointmentId: string; accepted: boolean }
-  | { event: "DELEGATION_RECEIVED"; delegationId: string };
+  | { event: "DELEGATION_RECEIVED"; delegationId: string }
+  | { event: "DOCUMENT_ACCEPTED"; documentRequestId: string };
 
 const TYPE: Record<ProEvent, NotificationType> = {
   BOOKING_REQUESTED: "PRO_BOOKING_REQUESTED",
@@ -35,6 +36,7 @@ const TYPE: Record<ProEvent, NotificationType> = {
   WAITLIST_JOINED: "PRO_WAITLIST_JOINED",
   WAITLIST_OFFER_ANSWERED: "PRO_WAITLIST_OFFER_ANSWERED",
   DELEGATION_RECEIVED: "PRO_DELEGATION_RECEIVED",
+  DOCUMENT_ACCEPTED: "PRO_DOCUMENT_ACCEPTED",
 };
 
 type Built = { professionalId: string; organizationId: string; patientId?: string; appointmentId?: string; subject: string; lines: string[]; link: string };
@@ -88,6 +90,18 @@ async function build(input: ProEventInput): Promise<Built | null> {
         ? { professionalId: e.professionalId, organizationId: e.organizationId, patientId: e.patientId, appointmentId: input.appointmentId, subject: `${e.patient.name} aceitou o horário oferecido`, lines: [`${e.patient.name} confirmou o horário de ${when} oferecido pela lista de espera.`], link: `${base()}/agenda/${input.appointmentId}` }
         : { professionalId: e.professionalId, organizationId: e.organizationId, patientId: e.patientId, subject: `${e.patient.name} recusou o horário oferecido`, lines: [`${e.patient.name} não ficou com o horário de ${when}. A pessoa continua na lista de espera; o horário voltou a ficar livre.`], link: `${base()}/agenda/espera` };
     }
+    case "DOCUMENT_ACCEPTED": {
+      const r = await db.documentRequest.findUnique({ where: { id: input.documentRequestId }, select: { id: true, organizationId: true, professionalId: true, patientId: true, titleSnapshot: true, templateVersion: true, patient: { select: { name: true } } } });
+      if (!r) return null;
+      return {
+        professionalId: r.professionalId,
+        organizationId: r.organizationId,
+        patientId: r.patientId,
+        subject: `${r.patient.name} aceitou: ${r.titleSnapshot}`,
+        lines: [`${r.patient.name} leu e aceitou "${r.titleSnapshot}" (versão ${r.templateVersion}).`, "O registro do aceite está na ficha do paciente."],
+        link: `${base()}/pacientes/${r.patientId}/documentos/${r.id}`,
+      };
+    }
     case "DELEGATION_RECEIVED": {
       const d = await db.clinicalDelegation.findUnique({
         where: { id: input.delegationId },
@@ -107,12 +121,12 @@ async function build(input: ProEventInput): Promise<Built | null> {
 
 function render(b: Built, event: ProEvent, proName: string): { text: string; html: string } {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-  const text = [`Olá, ${proName}.`, "", ...b.lines, "", `Abrir: ${b.link}`, "", "— Hecca Psico", unsubscribeHint(event)].join("\n");
+  const text = [`Olá, ${proName}.`, "", ...b.lines, "", `Abrir: ${b.link}`, "", "— Heeca Mind", unsubscribeHint(event)].join("\n");
   const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;color:#222;max-width:560px">
 <p>Olá, ${esc(proName)}.</p>
 ${b.lines.map((l) => `<p>${esc(l)}</p>`).join("\n")}
-<p><a href="${esc(b.link)}" style="display:inline-block;background:#3f6b4e;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px">Abrir no Hecca Psico</a></p>
-<p style="color:#777;font-size:12px">— Hecca Psico<br>${esc(unsubscribeHint(event))}</p>
+<p><a href="${esc(b.link)}" style="display:inline-block;background:#3f6b4e;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px">Abrir no Heeca Mind</a></p>
+<p style="color:#777;font-size:12px">— Heeca Mind<br>${esc(unsubscribeHint(event))}</p>
 </div>`;
   return { text, html };
 }

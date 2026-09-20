@@ -31,7 +31,13 @@ export type Actor = {
 export function canManageSchedule(actor: Actor, professionalId: string): boolean {
   if (actor.role === "OWNER") return true;
   if (actor.role === "RECEPTIONIST") return true;
+  if (actor.role === "FINANCE") return false; // agenda só leitura
   return actor.professionalId === professionalId;
+}
+
+/** Pode criar/editar o cadastro administrativo de pacientes? Financeiro só consulta. */
+export function canManagePatients(actor: Actor): boolean {
+  return actor.role !== "FINANCE";
 }
 
 /** Pode editar o perfil público, serviços e configurações de um profissional? */
@@ -42,7 +48,7 @@ export function canEditProfessional(actor: Actor, professionalId: string): boole
 
 /** Pode ver dados financeiros (valores, pagamentos, faturamento)? */
 export function canViewFinancials(actor: Actor, professionalId: string): boolean {
-  if (actor.role === "OWNER") return true;
+  if (actor.role === "OWNER" || actor.role === "FINANCE") return true;
   return actor.professionalId === professionalId;
 }
 
@@ -54,6 +60,17 @@ export function canViewAnyFinancials(actor: Actor): boolean {
 /** Pode excluir (logicamente) um paciente? Recepção não — é decisão do profissional. */
 export function canDeletePatient(actor: Actor): boolean {
   return actor.role === "OWNER" || actor.role === "PROFESSIONAL";
+}
+
+/** Comissões: OWNER e FINANCE veem todas; profissional vê só a própria. Recepção nunca. */
+export function canViewCommissions(actor: Actor, professionalId: string): boolean {
+  if (actor.role === "OWNER" || actor.role === "FINANCE") return true;
+  return actor.role === "PROFESSIONAL" && actor.professionalId === professionalId;
+}
+
+/** Regras, fechamentos e ajustes de comissão: decisão do dono; Financeiro executa. */
+export function canManageCommissions(actor: Actor): boolean {
+  return actor.role === "OWNER" || actor.role === "FINANCE";
 }
 
 /** Pode gerenciar membros da organização (convidar, remover, alterar papel)? */
@@ -87,6 +104,6 @@ export function canManageMembers(actor: Actor): boolean {
  * Toda leitura permitida gera um ClinicalAccessLog (src/lib/clinical.ts).
  */
 export function canAccessClinicalData(actor: Actor, treatingProfessionalId: string): boolean {
-  if (actor.role === "RECEPTIONIST") return false;
+  if (actor.role === "RECEPTIONIST" || actor.role === "FINANCE") return false;
   return actor.professionalId !== null && actor.professionalId === treatingProfessionalId;
 }

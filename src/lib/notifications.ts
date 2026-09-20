@@ -1,8 +1,10 @@
 import "server-only";
-import type { NotificationType } from "@/generated/prisma/enums";
+import { randomBytes } from "node:crypto";
 import { db } from "./db";
 import { formatDateBR, slotLabelInTz } from "./time";
-import { buildVariables, TEMPLATES, type WhatsAppNotificationType } from "./whatsapp/templates";
+import { buildButtons, buildVariables, TEMPLATES, type WhatsAppNotificationType, type WhatsAppPayload } from "./whatsapp/templates";
+import { parseCommsPrefs, reminderAllowed } from "./comms-prefs";
+import { DEFAULT_REACTIVATION_TEXT } from "./reports/rules";
 
 /**
  * Enfileira notificações de WhatsApp para um agendamento.
@@ -28,12 +30,15 @@ export async function enqueueAppointmentNotification(
       modality: true,
       confirmationToken: true,
       onlineLink: true,
+      serviceNameSnapshot: true,
       patient: { select: { id: true, name: true, whatsapp: true } },
+      service: { select: { patientInstructions: true } },
       professional: {
         select: {
           displayName: true,
+          slug: true,
           onlinePlatform: true,
-          organization: { select: { timezone: true } },
+          organization: { select: { name: true, timezone: true, type: true } },
           scheduleSettings: { select: { confirmationTimeoutHours: true } },
         },
       },
@@ -41,25 +46,38 @@ export async function enqueueAppointmentNotification(
   });
 
   const tz = a.professional.organization.timezone;
+  const modality = a.modality === "ONLINE" ? "Online" : "Presencial";
   const values: Record<string, string> = {
     patientFirstName: a.patient.name.split(" ")[0] ?? a.patient.name,
     professionalName: a.professional.displayName,
-    modality: a.modality === "ONLINE" ? "Online" : "Presencial",
+    // Templates unificados falam em "estabelecimento": para o autônomo é o próprio nome profissional.
+    establishment: a.professional.organization.type === "CLINIC" ? a.professional.organization.name : a.professional.displayName,
+    // O serviço leva a modalidade — para o paciente de psicologia isso é o dado que importa —
+    // salvo quando o nome do serviço já a traz ("Sessão online").
+    service: new RegExp(`\\b${modality}\\b`, "i").test(a.serviceNameSnapshot) ? a.serviceNameSnapshot : `${a.serviceNameSnapshot} (${modality.toLowerCase()})`,
+    modality,
     date: formatDateBR(a.startsAt, tz),
     time: slotLabelInTz(a.startsAt, tz),
+    when: "amanhã",
+    // Orientações administrativas do serviço (nunca clínicas); a Meta não aceita parâmetro vazio → " ".
+    instructions: instructionsParam(a.service.patientInstructions),
     platform: PLATFORM_LABEL[a.professional.onlinePlatform ?? "OTHER"],
     holdHours: String(a.professional.scheduleSettings?.confirmationTimeoutHours ?? 24),
   };
 
   const spec = TEMPLATES[type];
-  const payload: { bodyVariables: string[]; buttonUrlSuffixes?: Array<{ index: number; suffix: string }> } = {
-    bodyVariables: buildVariables(type, values),
-  };
-  if (spec.urlButton) {
-    // Sufixo da URL dinâmica: sempre o token (não adivinhável), nunca o id.
-    if (!a.confirmationToken) throw new Error(`Agendamento ${a.id} sem token para botão de URL`);
-    payload.buttonUrlSuffixes = [{ index: spec.urlButton.index, suffix: a.confirmationToken }];
+  // Botões (quick_reply e URL) carregam o token da sessão. Sessões criadas manualmente nascem sem
+  // token; o primeiro template com botão o cria — é só um identificador não adivinhável.
+  let confirmationToken = a.confirmationToken;
+  if (!confirmationToken && spec.buttons?.some((b) => b.type === "quick_reply" || b.suffix === "confirmationToken")) {
+    confirmationToken = randomBytes(24).toString("base64url");
+    await db.appointment.update({ where: { id: a.id }, data: { confirmationToken } });
   }
+  const payload: WhatsAppPayload = {
+    bodyVariables: buildVariables(type, values),
+    // Sufixos/payloads dos botões: sempre o token (não adivinhável) ou o slug público, nunca o id.
+    buttons: buildButtons(type, { confirmationToken, professionalSlug: a.professional.slug }),
+  };
 
   return db.notification.create({
     data: {
@@ -74,6 +92,14 @@ export async function enqueueAppointmentNotification(
       scheduledFor: opts.scheduledFor ?? new Date(),
     },
   });
+}
+
+/** Parâmetro {{6}} do heeca_confirmado: frase curta terminada em espaço, ou " " quando não há orientações. */
+function instructionsParam(text: string | null | undefined): string {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return " ";
+  const cut = t.length > 160 ? t.slice(0, 157).trimEnd() + "…" : t;
+  return /[.!?…]$/.test(cut) ? cut + " " : cut + ". ";
 }
 
 const PLATFORM_LABEL = {
@@ -101,14 +127,16 @@ export async function cancelQueuedNotifications(appointmentId: string) {
  * Idempotente: não duplica se já houver uma QUEUED do mesmo tipo.
  */
 export async function scheduleReminder(appointmentId: string, startsAt: Date) {
-  const a = await db.appointment.findUniqueOrThrow({ where: { id: appointmentId }, select: { modality: true } });
-  const plan: Array<{ type: WhatsAppNotificationType; at: Date }> = [
+  const a = await db.appointment.findUniqueOrThrow({ where: { id: appointmentId }, select: { modality: true, patient: { select: { commsPrefs: true } } } });
+  const prefs = parseCommsPrefs(a.patient.commsPrefs);
+  const plan: Array<{ type: "REMINDER_24H" | "REMINDER_2H" | "SESSION_LINK"; at: Date }> = [
     { type: "REMINDER_24H", at: new Date(startsAt.getTime() - 24 * 60 * 60 * 1000) },
   ];
   if (a.modality === "ONLINE") plan.push({ type: "SESSION_LINK", at: new Date(startsAt.getTime() - 2 * 60 * 60 * 1000) });
 
   for (const { type, at } of plan) {
     if (at <= new Date()) continue;
+    if (!reminderAllowed(prefs, type)) continue; // preferência do paciente (§12)
     const exists = await db.notification.findFirst({ where: { appointmentId, type, status: "QUEUED" }, select: { id: true } });
     if (exists) continue;
     await enqueueAppointmentNotification(appointmentId, type, { scheduledFor: at });
@@ -147,8 +175,82 @@ export async function enqueueFormRequest(requestId: string, token: string) {
           professionalName: r.professional.displayName,
           formTitle: r.titleSnapshot,
         }),
-        buttonUrlSuffixes: [{ index: spec.urlButton!.index, suffix: token }],
-      },
+        buttons: buildButtons(type, { formToken: token }),
+      } satisfies WhatsAppPayload,
+    },
+  });
+}
+
+function establishmentOf(org: { name: string; type: string }, proName: string) {
+  return org.type === "CLINIC" ? org.name : proName;
+}
+
+/** Pesquisa de experiência (§29), agendada para depois da sessão. */
+export async function enqueueSurvey(surveyId: string, token: string, scheduledFor: Date) {
+  const s = await db.experienceSurvey.findUniqueOrThrow({ where: { id: surveyId }, select: { organizationId: true, appointmentId: true, patient: { select: { id: true, name: true, whatsapp: true } }, professional: { select: { displayName: true, organization: { select: { name: true, type: true } } } } } });
+  const type = "SURVEY" as const;
+  return db.notification.create({
+    data: {
+      organizationId: s.organizationId, appointmentId: s.appointmentId, patientId: s.patient.id, channel: "WHATSAPP", type, recipient: s.patient.whatsapp, templateName: TEMPLATES[type].name, scheduledFor,
+      payload: { bodyVariables: buildVariables(type, { patientFirstName: s.patient.name.split(" ")[0] ?? s.patient.name, establishment: establishmentOf(s.professional.organization, s.professional.displayName) }), buttons: buildButtons(type, { surveyToken: token }) } satisfies WhatsAppPayload,
+    },
+  });
+}
+
+/** Convite de retorno (§28) — template unificado heeca_retorno; texto do convite é configurável pelo profissional. */
+export async function enqueueReactivation(patientId: string, professionalId: string) {
+  const [p, pro] = await Promise.all([
+    db.patient.findUniqueOrThrow({ where: { id: patientId }, select: { id: true, organizationId: true, name: true, whatsapp: true } }),
+    db.professional.findUniqueOrThrow({ where: { id: professionalId }, select: { displayName: true, slug: true, policy: { select: { reactivationInviteText: true } }, organization: { select: { name: true, type: true } } } }),
+  ]);
+  const type = "REACTIVATION" as const;
+  const invite = (pro.policy?.reactivationInviteText?.trim() || DEFAULT_REACTIVATION_TEXT).replace(/\s+/g, " ");
+  return db.notification.create({
+    data: {
+      organizationId: p.organizationId, patientId: p.id, channel: "WHATSAPP", type, recipient: p.whatsapp, templateName: TEMPLATES[type].name,
+      payload: { bodyVariables: buildVariables(type, { patientFirstName: p.name.split(" ")[0] ?? p.name, establishment: establishmentOf(pro.organization, pro.displayName), invite }), buttons: buildButtons(type, { professionalSlug: pro.slug }) } satisfies WhatsAppPayload,
+    },
+  });
+}
+
+/** Link mágico do portal do paciente (D4). Token em claro só na mensagem; 15 min; uso único. */
+export async function enqueuePortalLogin(patientId: string, token: string) {
+  const p = await db.patient.findUniqueOrThrow({ where: { id: patientId }, select: { id: true, organizationId: true, name: true, whatsapp: true, organization: { select: { name: true, type: true, professionals: { where: { isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { displayName: true } } } } } });
+  const type = "PORTAL_LOGIN" as const;
+  const establishment = p.organization.type === "CLINIC" ? p.organization.name : (p.organization.professionals[0]?.displayName ?? p.organization.name);
+  return db.notification.create({
+    data: {
+      organizationId: p.organizationId,
+      patientId: p.id,
+      channel: "WHATSAPP",
+      type,
+      recipient: p.whatsapp,
+      templateName: TEMPLATES[type].name,
+      payload: { bodyVariables: buildVariables(type, { patientFirstName: p.name.split(" ")[0] ?? p.name, establishment }), buttons: buildButtons(type, { portalToken: token }) } satisfies WhatsAppPayload,
+    },
+  });
+}
+
+/** Documento para ler e aceitar (termo, contrato). Token em claro só na mensagem. */
+export async function enqueueDocumentRequest(requestId: string, token: string) {
+  const r = await db.documentRequest.findUniqueOrThrow({
+    where: { id: requestId },
+    select: { organizationId: true, appointmentId: true, titleSnapshot: true, patient: { select: { id: true, name: true, whatsapp: true } }, professional: { select: { displayName: true } } },
+  });
+  const type = "DOCUMENT_REQUEST" as const;
+  return db.notification.create({
+    data: {
+      organizationId: r.organizationId,
+      appointmentId: r.appointmentId,
+      patientId: r.patient.id,
+      channel: "WHATSAPP",
+      type,
+      recipient: r.patient.whatsapp,
+      templateName: TEMPLATES[type].name,
+      payload: {
+        bodyVariables: buildVariables(type, { patientFirstName: r.patient.name.split(" ")[0] ?? r.patient.name, professionalName: r.professional.displayName, documentTitle: r.titleSnapshot }),
+        buttons: buildButtons(type, { documentToken: token }),
+      } satisfies WhatsAppPayload,
     },
   });
 }

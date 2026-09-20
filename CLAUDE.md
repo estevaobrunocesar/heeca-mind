@@ -1,6 +1,6 @@
-# Hecca Psico
+# Heeca Mind
 
-SaaS multi-tenant de agenda e agendamento online para psicólogos. Spec completa em `docs/SPEC.md`.
+Vertical de saúde mental da plataforma Heeca (antes "Hecca Psico"; o produto foi rebatizado em 20/09/2026 e está sendo integrado ao Core — portal, Notify, R2). Spec original em `docs/SPEC.md`; arquitetura, ERD, fluxos, plano e decisões do Mind em `docs/mind/` (comece pelo `docs/mind/README.md`; decisões D1–D9 fechadas em 20/09 conforme as recomendações do `06-GAPS-E-PLANO.md`).
 
 ## Stack
 
@@ -15,9 +15,13 @@ SaaS multi-tenant de agenda e agendamento online para psicólogos. Spec completa
 docker compose up -d          # Postgres local na porta 5433
 npm run db:migrate            # prisma migrate dev
 npm run db:seed               # ana@exemplo.com / senha12345 → /agendar/dra-ana-lucia
-npm run dev
+npm run dev                   # após mudar o schema: prisma generate + reiniciar (o processo guarda o client antigo)
+# NUNCA rode `npm run build` ou `next typegen` com o dev server ligado: corrompe .next/dev e rotas passam a dar 404.
+# Se acontecer: parar o dev, `rm -rf .next`, subir de novo.
 npm run cron                  # roda dispatcher/expiração/webhook uma vez (dev)
-npm run webhook:sim -- message +5511999990000 "sim"   # simula resposta do paciente
+npm run heeca:sim -- provision ana@exemplo.com          # simula o portal (provision/entitlement/sso) e o Notify (callbacks)
+npm run check:tenant          # isolamento por tenant dos módulos do Mind (banco local)
+npm run check:lgpd            # anonimização (banco local)
 npm test
 npm run build                 # build de produção (NODE_ENV=production)
 npm run docker:build          # imagem Docker
@@ -54,11 +58,66 @@ prisma/                schema, migrations, seed
 | 2 Configuração do consultório | ✅ perfil, grade semanal, regras, bloqueios/exceções, políticas |
 | 3 Serviços | ✅ CRUD, ordenação, ativar/desativar, exclusão protegida |
 | 4 Agenda | ✅ dia/semana/mês, criação manual + recorrência, transições de status, reagendar, cancelar série |
-| 5 Pacientes | ✅ listagem com busca/filtros, ficha com histórico e indicadores, criar/editar, exclusão lógica LGPD + restauração |
+| 5 Pacientes | ✅ listagem com busca/filtros/etiquetas, ficha administrativa completa (§12), criar/editar, exclusão lógica LGPD + restauração |
 | 6 Agendamento público | ✅ modalidade → mês → dia → horário → dados + LGPD; confirmação/cancelamento por token |
 | 7 WhatsApp | ✅ dispatcher com retry, webhook (status + respostas), expiração de pendentes, link de sessão, painel /mensagens — falta só credenciais reais da Meta |
 | 8 Dashboard | ✅ sessões do dia, próxima, pacientes ativos, confirmadas, pendentes, cancelamentos, reagendamentos, online/presencial, faturamento, comparecimento |
-| 9 Financeiro | ✅ pagamento (parcial/integral/isento/desfazer) na sessão, /financeiro por mês com realizado/recebido/a receber/previsto, marcar pago em 1 clique, CSV |
+| 9 Financeiro | ✅ pagamento (parcial/integral/isento/desfazer) na sessão, /financeiro por mês com realizado/recebido/a receber/previsto (+ pacotes vendidos), marcar pago em 1 clique, CSV com origem |
+| 10 Pacotes | ✅ catálogo, venda na ficha, vínculo/auto-vínculo, consumo em concluída/falta (política), reversão, expiração |
+| 11 Documentos | ✅ modelos versionados com variáveis, envio por WhatsApp, aceite com hash, registro imprimível, envio automático na 1ª sessão |
+| 12 Portal do paciente | ✅ link mágico, sessões, reagendar/cancelar pela política, pagamentos, pacotes, documentos, dados próprios |
+| 13 Comissões | ✅ regras por profissional/serviço, lançamento por pagamento recebido, fechamento imutável, estorno, ajuste, CSV |
+| 14 Relatórios e retenção | ✅ /relatorios (§27) com definições explícitas, cards §26 no dashboard, reativação por clique, pesquisa de experiência |
+
+## Segmento e registro profissional (Mind, etapa 0)
+
+- `Organization.segment` (`PSYCHOLOGY` | `THERAPY`, default PSYCHOLOGY) decide o tipo de registro padrão. O MVP só exibe Psicologia; não criar telas de segmento agora.
+- `Professional.registrationKind` (`CRP` | `CRN` | `CRFa` | `NONE`) + `registrationNumber` (nulo = perfil provisionado pelo portal e ainda não preenchido) substituem o antigo `crp`. Regras puras em `src/lib/registration.ts` (testado); formulários usam `registrationField(kind)` de `src/lib/validation/registration.ts`. **Nunca** formatar "CRP …" à mão: telas chamam `formatRegistration(p)` (respeita `showRegistration`) e documentos oficiais `formatRegistration(p, { force: true })`.
+- Convite de equipe herda o tipo de registro do segmento da organização (`DEFAULT_REGISTRATION_BY_SEGMENT`).
+
+## CRM e clínica (Mind, etapa 2)
+
+- Papéis: OWNER, PROFESSIONAL, RECEPTIONIST, **FINANCE** (valores de todos, agenda e pacientes só leitura, nunca clínico). Criar/editar paciente exige `canManagePatients`; recepção continua podendo.
+- Ficha do paciente (§12): `phone`, `birthDate` (`@db.Date`, ler/gravar em UTC), endereço, contato de emergência, `commsPrefs` (`src/lib/comms-prefs.ts`, puro; null = tudo ligado; só afeta lembretes — `scheduleReminder` respeita), `lastCompletedAt` (gravado em `completeAppointmentAction`; base da reativação) e **tags** (`Tag` por organização, upsert por nome em `syncPatientTags`; `/pacientes?tag=`). Tudo administrativo: entra na exportação do titular e na anonimização.
+- Cadastro da clínica (§6) em `/configuracoes/clinica` (só OWNER): `organizationSchema`; CPF/CNPJ validado por dígito verificador em `src/lib/br-document.ts` (puro), guardado só dígitos. O bloco nome/slug saiu da aba Equipe.
+- `AppointmentStatus.IN_PROGRESS` ("Em atendimento"): ação `start`; em atendimento só conclui.
+- **Fronteira cliente/servidor**: `src/lib/validation/*`, `comms-prefs`, `registration`, `br-document` são importados por componentes cliente — nunca importar `@/generated/prisma/client` (runtime) neles; `Prisma.JsonNull` fica nas actions. O `tsc` não pega isso; só o `next build`/Turbopack.
+
+## Pacotes de sessões (Mind, etapa 3 — §20, decisões D1/D2)
+
+- `src/lib/packages/rules.ts` é puro e testado: **saldo = total − consumos não revertidos, sempre calculado**; `effectiveStatus` (CANCELLED > EXHAUSTED > EXPIRED > ACTIVE); `covers` (mesmo profissional; `serviceIds` vazio = qualquer); `consumeReasonFor` (COMPLETED sempre; NO_SHOW se `ProfessionalPolicy.noShowConsumesPackage`); `expiresAtFor` = fim do dia civil no fuso da organização. `service.ts` liga ao banco.
+- `Package` (catálogo, por profissional como os serviços) → `PackagePurchase` (venda; **snapshot** de nome, sessões, preço e cobertura) → `PackageConsumption` (uma por sessão, `appointmentId` único; reverter marca `revertedAt`, não apaga).
+- Sessão coberta: `Appointment.packagePurchaseId` + `paymentStatus = PACKAGE` — **não entra em realizado nem em a receber**; a receita é a venda (`Payment.packagePurchaseId`). `Payment` é polimórfico com check constraint: exatamente um de `appointmentId`/`packagePurchaseId`. Financeiro e CSV tratam PACKAGE e listam as vendas do mês.
+- Fluxo: vincular (ficha/sessão, ou `autoLinkPackage` na criação quando há **um único** pacote ativo que cobre) → consumir em `transition()` via `consumeIfDue` (idempotente) → reverter com motivo. Cancelar a compra devolve as sessões futuras vinculadas a PENDING. Cron: `expirePurchases`.
+- Cliente: `PackagesPanel` (ficha), `PackageSection` (sessão), `/pacotes` (catálogo). Formulários que fecham ao salvar usam `useEffect` em `state.ok`, nunca chamada no render.
+
+## Documentos administrativos e consentimentos (Mind, etapa 4 — §15, D6)
+
+- `src/lib/documents/rules.ts` (puro, testado): variáveis permitidas (`DOCUMENT_VARIABLES` — nada clínico), `renderDocument` com `missing`, `bodyHash` (texto canônico), `acceptanceHash` = sha256(bodyHash|nome normalizado|instante ISO|IP), `nameMatches` (completo ou primeiro+último, sem acento/caixa), `isNewVersion`, modelos iniciais.
+- `DocumentTemplate` (por profissional; salvar com título/texto diferente **incrementa `version`**) → `DocumentRequest` (snapshot **renderizado** + hash; token só-hash; um em aberto por modelo+paciente; reenviar troca token e snapshot). Mesmo desenho dos formulários; TTL 30 dias; cron expira e faz o envio automático dos "exigir antes da 1ª sessão".
+- Aceite em `/documento/[token]` (rota pública no proxy): nome precisa conferir com o cadastro; grava nome, IP, UA, hash; e-mail `PRO_DOCUMENT_ACCEPTED` ao profissional; WhatsApp `heeca_mind_documento`. Aceito não se cancela — envia-se nova versão. "PDF" = página de impressão (`PrintButton`), como o prontuário.
+- Anonimização (D6): mantém texto e hashes, zera nome/IP/UA; pendentes viram REVOKED. Registro interno em `/pacientes/[id]/documentos/[requestId]` (auditado como `document.view_record`).
+- Os `FormTemplate` com `dataClass=ADMINISTRATIVE` continuam válidos como questionários; termos novos devem nascer como documentos.
+
+## Portal do paciente (Mind, etapa 5 — §17, D4)
+
+- `/portal/[slug]` (slug do profissional dá o tenant). Entrada por **link mágico no WhatsApp** (`PatientAccessToken`, 15 min, uso único, template `heeca_mind_acesso_portal`); resposta sempre neutra (não revela se o número existe); rate limit `portal:phone` 3/h e `portal:ip`. `/portal/entrar/[token]` troca por `PatientSession` + cookie `hm_patient` (HttpOnly, path `/portal`, 30 dias) — **nunca** sessão do Auth.js; o paciente não é User.
+- `src/lib/portal/service.ts`: `getPortalActor(organizationId)` (sessão válida e da organização do slug), home (sessões, pagamentos em aberto, pacotes, documentos), `patientCanChange` (status ativo + prazo `minCancelHours`/`minRescheduleHours`), cancelar/reagendar (mesma disponibilidade da página pública com `excludeAppointmentId`; `isSlotAvailable` reconferido no servidor), abrir documento pendente (gira o token), dados próprios (nunca nome/WhatsApp), `revokePatientSessions`, `purgePortal` no cron.
+- Nada clínico é lido no portal — nem por engano: as queries selecionam só campos administrativos. Ações do paciente auditam com `actor = null` e `after.by = "portal"`.
+- Sessões criadas manualmente não têm `confirmationToken`; `enqueueAppointmentNotification` cria um quando o template exige botão (os unificados `heeca_lembrete`/`heeca_confirmacao` exigem).
+
+## Comissões (Mind, etapa 6 — §25, D3)
+
+- Base = **valor recebido** (`Payment`, sessão ou pacote). Gancho único: `onPaymentRecorded(paymentId)` depois de criar o pagamento e `onPaymentsReverted(ids)` **antes** de apagar; ambos idempotentes e nunca lançam (comissão não pode impedir um recebimento).
+- `src/lib/commissions/rules.ts` (puro, testado): `pickRule` (serviço > geral; mais recente vence; validade inclusiva), `computeAmount` (basis points, arredonda para baixo), `packagePaymentAmount` (percentual sobre o pago; fixo proporcional às sessões pagas), `openTotal`, `validateRule`.
+- `CommissionEntry` nunca é editado. Fechamento (`closePeriod`) é imutável: estorno de pagamento já fechado vira lançamento **REVERSAL negativo** em aberto; ajuste manual é ADJUSTMENT. Regras não se apagam — encerram a vigência (`validTo`).
+- Permissões: `canViewCommissions` (OWNER/FINANCE todos; PROFESSIONAL só o próprio), `canManageCommissions` (OWNER/FINANCE). Telas: `/financeiro/comissoes` (+ CSV auditado), `/configuracoes/comissoes`.
+
+## Dashboard, relatórios, reativação e pesquisa (Mind, etapa 7 — §26–§29)
+
+- `src/lib/reports/rules.ts` (puro, testado) define cada indicador e a UI mostra "como é calculado": ocupação = minutos ocupados ÷ minutos de grade (`workingMinutes`, capacidade nominal sem bloqueios); ticket médio = recebido ÷ concluídas cobradas; clientes novo/ativo/recorrente/inativo e retenção (`clientCohorts`); `surveySummary`; `reactivationCandidates`. `/relatorios` (OWNER/FINANCE: clínica toda ou por profissional; PROFESSIONAL: o próprio; valores só com `canViewFinancials`). Dashboard ganhou novos/inativos/ocupação 7 dias/lista de espera.
+- **Pesquisa de experiência** (`ExperienceSurvey`): liga em Políticas (`surveyEnabled`); `scheduleSurveyForAppointment` no `completeAppointmentAction` cria a pesquisa e enfileira `heeca_mind_pesquisa` para +24 h; `/pesquisa/[token]` (pública, uso único, 0–10 + comentário). Administrativa e privada — texto na UI diz explicitamente que não é sobre o acompanhamento. Anonimização zera o comentário e mantém a nota.
+- **Reativação** (`/pacientes/reativacao`): lista = `reactivationCandidates` com `ProfessionalPolicy.reactivationAfterDays`; **nada automático** — cada convite é um clique que enfileira o unificado `heeca_retorno` (frase configurável `reactivationInviteText`, botão Agendar → `/a/mind/<slug>`) e grava `ReactivationContact` (não repete antes de N dias).
 
 ## Padrões de formulário
 
@@ -92,13 +151,22 @@ prisma/                schema, migrations, seed
 - Rotas públicas (`agendar`, `confirmar`, `sessao`) ficam fora do matcher do proxy — ver `src/proxy.ts`.
 - Rate limit em `src/lib/rate-limit.ts` (janela fixa no Postgres, chaves sha256): público por IP/telefone/profissional + teto de 2 pendentes por número; ações por token; login por IP e e-mail; reset por IP. Sem header de proxy, anônimos caem no balde "unknown". Limpeza no cron.
 
+## Plataforma Heeca — portal e Notify (Mind, etapa 1)
+
+- `src/lib/heeca/core.ts` é puro (HMAC, JWT HS256 do SSO, mapeamentos) e testado; `service.ts` liga ao banco: `provision` (idempotente por `heecaSubscriptionId`), `applyEntitlement` (espelha `accessState/planCode/planLimits`), `resolveSsoUser` (jti de uso único via `RateLimit`). Rotas: `/api/heeca/provision|entitlement` (HMAC) e `/sso/heeca` (JWT → provider `heeca-sso` do Auth.js → mesma `user_sessions`, mesmo MFA).
+- **O portal é dono de plano e cobrança.** Nada aqui cobra o profissional; telas de assinatura apontam para `portalAccountUrl()`. `accessState=BLOCKED` → o layout do app manda para `/bloqueado`; `WARNING` → `AccessBanner`. Com `HEECA_PLATFORM_SECRET` definido, `/cadastro` redireciona para o portal e a action recusa.
+- Usuário criado por SSO nasce com senha inutilizável; "esqueci a senha" cria uma local. Papel do portal OWNER/ADMIN → OWNER; demais → RECEPTIONIST (BILLING → FINANCE quando existir).
+- Simulador: `npm run heeca:sim` (provision, entitlement, sso, notify) — ver docs/DEPLOY.md §5.
+
 ## WhatsApp (ver docs/WHATSAPP.md)
 
+- **Envio só pelo Heeca Notify** (`WHATSAPP_PROVIDER=notify`, `src/lib/whatsapp/notify.ts`): nenhum token da Meta neste app. Callback assinado em `/api/webhooks/notify` → `inbound.ts` traduz para o evento bruto que o dispatcher já processava; `tenantId`/`ref` do callback são conferidos contra a `Notification`.
+- `templates.ts`: unificados da plataforma (`heeca_confirmacao|confirmado|lembrete|cancelado|remarcado`) precisam bater em nº de parâmetros e tipos de botão com `heeca_notify/src/lib/templates.ts` (teste `tests/notify.test.ts` espelha); específicos são `heeca_mind_*`. Botões quick_reply levam `<intenção>:<confirmationToken>`; `applyReply` resolve pelo token (e confere o telefone) antes de cair no texto livre por número. "Remarcar" nunca cancela.
 - `src/lib/whatsapp/dispatcher.ts`: `runCron()` = processa webhook → expira pendentes → envia fila. Chamado por `/api/cron` (Bearer `CRON_SECRET`) a cada minuto ou `npm run cron`.
 - Claim atômico `QUEUED → SENDING` antes de enviar; retry com backoff só para erros retryable; máx. 5 tentativas.
 - Respostas do paciente: `src/lib/whatsapp/replies.ts` (puro, testado). "não" fora do prazo vira `RESCHEDULE_REQUESTED`, não cancela.
 - Botões de URL nos templates usam sempre `confirmationToken` como sufixo (`/confirmar/<token>`, `/sessao/<token>`).
-- Sem credenciais da Meta, `ConsoleWhatsAppProvider` loga e marca como SENT — não confundir com entrega real.
+- `WHATSAPP_PROVIDER=console`: `ConsoleWhatsAppProvider` loga e marca como SENT — não confundir com entrega real. `SKIPPED` do Notify (opt-out/cota) vira FAILED com o motivo, sem retry.
 
 ## Pacientes
 
@@ -116,7 +184,7 @@ prisma/                schema, migrations, seed
 ## Storage de arquivos
 
 - `src/lib/storage/`: interface `StorageProvider`, drivers `local` (public/uploads, dev e VPS) e `s3` (SigV4 manual, testado contra o vetor da AWS; funciona com S3/R2/MinIO). `STORAGE_DRIVER` escolhe.
-- Toda chave leva o prefixo `hecca-psico/` — o bucket pode ser compartilhado entre os produtos Heeca.
+- Toda chave leva o prefixo `mind/` (`KEY_PREFIX`). Em produção o bucket é exclusivo do produto (`heeca-mind`, regra "cada produto é individual" da plataforma).
 - Foto de perfil: recorte quadrado + resize 512px no navegador (canvas, sem `sharp`); servidor valida magic bytes (`src/lib/image.ts`) e 1,5 MB. SVG é recusado (pode carregar script). Chave com timestamp → cache imutável; a anterior é apagada em melhor esforço. `Professional.photoKey` guarda a chave para exclusão.
 - Server Actions aceitam até 10 MB (`next.config.ts`) — documentos clínicos vão até 8 MB.
 - **Objetos privados** (`putPrivate/getPrivate/deletePrivate`): nunca ganham URL. Driver local grava em `storage/private/` (fora de `public/`; `PRIVATE_STORAGE_DIR` aponta o volume em produção); S3 usa o mesmo bucket com `cache-control: private, no-store`. O chamador grava o conteúdo **já cifrado** — a confidencialidade vem da chave, não do bucket.
@@ -149,9 +217,9 @@ prisma/                schema, migrations, seed
 
 - Papéis: OWNER (tudo), PROFESSIONAL (só o próprio perfil/agenda/valores), RECEPTIONIST (agenda e pacientes de qualquer profissional; nunca valores, configurações ou equipe). `canViewAnyFinancials` esconde valores da recepção em telas cruzadas (menu, ficha do paciente).
 - Seletor de profissional: cookie `hp_pro` (`setActiveProfessionalAction`), validado no tenant a cada requisição em `resolveActiveProfessional`. PROFESSIONAL ignora o cookie.
-- Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com CRP/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.
+- Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com registro profissional/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.
 - Página pública da clínica: `/clinica/[slug]` (Organization.slug) lista profissionais ativos → `/agendar/[slug]`.
-- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica`.
+- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica|formulario|documento|portal|sso`.
 - Migrações com aviso interativo (índice único): `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` para a pasta e `prisma migrate deploy`.
 
 ## Deploy (ver docs/DEPLOY.md)

@@ -9,9 +9,12 @@ const TABS = [
   { href: "/configuracoes/bloqueios", label: "Bloqueios" },
   { href: "/configuracoes/politicas", label: "Políticas" },
   { href: "/configuracoes/seguranca", label: "Segurança" },
+  { href: "/configuracoes/clinica", label: "Clínica" },
   { href: "/configuracoes/equipe", label: "Equipe" },
   { href: "/configuracoes/delegacoes", label: "Delegações" },
   { href: "/configuracoes/formularios", label: "Formulários" },
+  { href: "/configuracoes/documentos", label: "Documentos" },
+  { href: "/configuracoes/comissoes", label: "Comissões" },
   { href: "/configuracoes/notificacoes", label: "Notificações" },
 ] as const;
 

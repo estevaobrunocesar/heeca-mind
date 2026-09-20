@@ -14,6 +14,7 @@ const TABS = [
   { href: "/configuracoes/delegacoes", label: "Delegações" },
   { href: "/configuracoes/formularios", label: "Formulários" },
   { href: "/configuracoes/documentos", label: "Documentos" },
+  { href: "/configuracoes/comissoes", label: "Comissões" },
   { href: "/configuracoes/notificacoes", label: "Notificações" },
 ] as const;
 

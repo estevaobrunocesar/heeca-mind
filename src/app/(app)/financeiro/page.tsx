@@ -97,9 +97,14 @@ export default async function FinancePage({ searchParams }: PageProps<"/financei
         title="Financeiro"
         description="Controle simples: o que foi realizado, o que entrou e o que falta receber. Sem emissão fiscal."
         actions={
-          <a href={`/financeiro/export?month=${month}`} className="btn-ghost">
-            Exportar CSV
-          </a>
+          <div className="flex gap-2">
+            <Link href="/financeiro/comissoes" className="btn-ghost">
+              Comissões
+            </Link>
+            <a href={`/financeiro/export?month=${month}`} className="btn-ghost">
+              Exportar CSV
+            </a>
+          </div>
         }
       />
 

@@ -18,7 +18,7 @@ import { balance, canLink, consumeReasonFor, effectiveStatus, expiresAtFor, type
 
 type Tx = Prisma.TransactionClient;
 
-const purchaseInclude = { consumptions: { select: { id: true, appointmentId: true, revertedAt: true, reason: true, consumedAt: true } }, payments: { select: { amountCents: true, paidAt: true, method: true } } } as const;
+const purchaseInclude = { consumptions: { select: { id: true, appointmentId: true, revertedAt: true, reason: true, consumedAt: true } }, payments: { select: { id: true, amountCents: true, paidAt: true, method: true } } } as const;
 
 export type PurchaseView = Awaited<ReturnType<typeof listPurchasesForPatient>>[number];
 

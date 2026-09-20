@@ -62,6 +62,17 @@ export function canDeletePatient(actor: Actor): boolean {
   return actor.role === "OWNER" || actor.role === "PROFESSIONAL";
 }
 
+/** Comissões: OWNER e FINANCE veem todas; profissional vê só a própria. Recepção nunca. */
+export function canViewCommissions(actor: Actor, professionalId: string): boolean {
+  if (actor.role === "OWNER" || actor.role === "FINANCE") return true;
+  return actor.role === "PROFESSIONAL" && actor.professionalId === professionalId;
+}
+
+/** Regras, fechamentos e ajustes de comissão: decisão do dono; Financeiro executa. */
+export function canManageCommissions(actor: Actor): boolean {
+  return actor.role === "OWNER" || actor.role === "FINANCE";
+}
+
 /** Pode gerenciar membros da organização (convidar, remover, alterar papel)? */
 export function canManageMembers(actor: Actor): boolean {
   return actor.role === "OWNER";

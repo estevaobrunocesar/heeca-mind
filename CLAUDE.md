@@ -62,6 +62,7 @@ prisma/                schema, migrations, seed
 | 10 Pacotes | ✅ catálogo, venda na ficha, vínculo/auto-vínculo, consumo em concluída/falta (política), reversão, expiração |
 | 11 Documentos | ✅ modelos versionados com variáveis, envio por WhatsApp, aceite com hash, registro imprimível, envio automático na 1ª sessão |
 | 12 Portal do paciente | ✅ link mágico, sessões, reagendar/cancelar pela política, pagamentos, pacotes, documentos, dados próprios |
+| 13 Comissões | ✅ regras por profissional/serviço, lançamento por pagamento recebido, fechamento imutável, estorno, ajuste, CSV |
 
 ## Segmento e registro profissional (Mind, etapa 0)
 
@@ -99,6 +100,13 @@ prisma/                schema, migrations, seed
 - `src/lib/portal/service.ts`: `getPortalActor(organizationId)` (sessão válida e da organização do slug), home (sessões, pagamentos em aberto, pacotes, documentos), `patientCanChange` (status ativo + prazo `minCancelHours`/`minRescheduleHours`), cancelar/reagendar (mesma disponibilidade da página pública com `excludeAppointmentId`; `isSlotAvailable` reconferido no servidor), abrir documento pendente (gira o token), dados próprios (nunca nome/WhatsApp), `revokePatientSessions`, `purgePortal` no cron.
 - Nada clínico é lido no portal — nem por engano: as queries selecionam só campos administrativos. Ações do paciente auditam com `actor = null` e `after.by = "portal"`.
 - Sessões criadas manualmente não têm `confirmationToken`; `enqueueAppointmentNotification` cria um quando o template exige botão (os unificados `heeca_lembrete`/`heeca_confirmacao` exigem).
+
+## Comissões (Mind, etapa 6 — §25, D3)
+
+- Base = **valor recebido** (`Payment`, sessão ou pacote). Gancho único: `onPaymentRecorded(paymentId)` depois de criar o pagamento e `onPaymentsReverted(ids)` **antes** de apagar; ambos idempotentes e nunca lançam (comissão não pode impedir um recebimento).
+- `src/lib/commissions/rules.ts` (puro, testado): `pickRule` (serviço > geral; mais recente vence; validade inclusiva), `computeAmount` (basis points, arredonda para baixo), `packagePaymentAmount` (percentual sobre o pago; fixo proporcional às sessões pagas), `openTotal`, `validateRule`.
+- `CommissionEntry` nunca é editado. Fechamento (`closePeriod`) é imutável: estorno de pagamento já fechado vira lançamento **REVERSAL negativo** em aberto; ajuste manual é ADJUSTMENT. Regras não se apagam — encerram a vigência (`validTo`).
+- Permissões: `canViewCommissions` (OWNER/FINANCE todos; PROFESSIONAL só o próprio), `canManageCommissions` (OWNER/FINANCE). Telas: `/financeiro/comissoes` (+ CSV auditado), `/configuracoes/comissoes`.
 
 ## Padrões de formulário
 

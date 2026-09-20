@@ -87,6 +87,9 @@ model Organization {
   packagePurchases    PackagePurchase[]
   documentTemplates   DocumentTemplate[]
   documentRequests    DocumentRequest[]
+  commissionRules     CommissionRule[]
+  commissionEntries   CommissionEntry[]
+  commissionClosings  CommissionClosing[]
   appointments        Appointment[]
   notifications       Notification[]
   auditLogs           AuditLog[]
@@ -300,6 +303,9 @@ model Professional {
   packagePurchases            PackagePurchase[]
   documentTemplates           DocumentTemplate[]
   documentRequests            DocumentRequest[]
+  commissionRules             CommissionRule[]
+  commissionEntries           CommissionEntry[]
+  commissionClosings          CommissionClosing[]
 
   @@index([organizationId])
   @@map("professionals")
@@ -886,6 +892,89 @@ model PatientSession {
   @@index([patientId, revokedAt])
   @@index([expiresAt])
   @@map("patient_sessions")
+}
+
+// ───────────────────────────────────────────────────────────────
+// COMISSÕES (§25; D3: base = valor recebido) — src/lib/commissions/
+// ───────────────────────────────────────────────────────────────
+
+/// Regra vigente por profissional; com serviceId prevalece sobre a geral. Percentual em basis points
+/// (1250 = 12,5 %) OU valor fixo por sessão — exatamente um dos dois.
+model CommissionRule {
+  id             String    @id @default(cuid())
+  organizationId String
+  professionalId String
+  serviceId      String?
+  percentBp      Int?
+  fixedCents     Int?
+  validFrom      DateTime  @db.Date
+  validTo        DateTime? @db.Date
+  note           String?
+  createdByUserId String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  entries      CommissionEntry[]
+
+  @@index([organizationId, professionalId, validFrom])
+  @@map("commission_rules")
+}
+
+enum CommissionEntryKind {
+  PAYMENT // gerado por um pagamento recebido (sessão ou pacote)
+  REVERSAL // estorno de um pagamento já fechado (linha negativa)
+  ADJUSTMENT // ajuste manual (bônus, desconto)
+}
+
+/// Um lançamento. Gerado no evento do pagamento; nunca editado. Fechado quando closingId != null.
+model CommissionEntry {
+  id                String              @id @default(cuid())
+  organizationId    String
+  professionalId    String
+  kind              CommissionEntryKind @default(PAYMENT)
+  paymentId         String?
+  appointmentId     String?
+  packagePurchaseId String?
+  ruleId            String?
+  baseCents         Int
+  amountCents       Int // pode ser negativo (REVERSAL/ADJUSTMENT)
+  occurredAt        DateTime
+  closingId         String?
+  note              String?
+  createdByUserId   String?
+  createdAt         DateTime            @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional       @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  rule         CommissionRule?    @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  closing      CommissionClosing? @relation(fields: [closingId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, professionalId, occurredAt])
+  @@index([paymentId])
+  @@index([closingId])
+  @@map("commission_entries")
+}
+
+/// Fechamento de período: imutável. Lançamentos depois do fechamento entram no próximo.
+model CommissionClosing {
+  id             String   @id @default(cuid())
+  organizationId String
+  professionalId String
+  periodStart    DateTime @db.Date
+  periodEnd      DateTime @db.Date
+  totalCents     Int
+  entriesCount   Int
+  closedAt       DateTime @default(now())
+  closedByUserId String
+  note           String?
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  entries      CommissionEntry[]
+
+  @@index([organizationId, professionalId, periodEnd])
+  @@map("commission_closings")
 }
 
 model PackageConsumption {

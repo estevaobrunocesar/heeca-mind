@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { canAccessClinicalData, canDeletePatient, canEditProfessional, canManageMembers, canManagePatients, canManageSchedule, canViewAnyFinancials, canViewFinancials, type Actor } from "../src/lib/permissions";
+import { canAccessClinicalData, canDeletePatient, canEditProfessional, canManageCommissions, canManageMembers, canManagePatients, canManageSchedule, canViewAnyFinancials, canViewCommissions, canViewFinancials, type Actor } from "../src/lib/permissions";
 
 const mk = (over: Partial<Actor>): Actor => ({ userId: "u", organizationId: "o", role: "PROFESSIONAL", professionalId: "p1", activeProfessionalId: "p1", ...over });
 
@@ -49,5 +49,18 @@ describe("FINANCE — valores de todos, agenda e pacientes só leitura, nunca cl
   });
   it("os demais papéis continuam podendo cadastrar pacientes", () => {
     for (const role of ["OWNER", "PROFESSIONAL", "RECEPTIONIST"] as const) assert.equal(canManagePatients(mk({ role })), true);
+  });
+});
+
+describe("comissões", () => {
+  it("OWNER e FINANCE veem todas e gerenciam; profissional vê só a própria; recepção nada", () => {
+    assert.equal(canViewCommissions(mk({ role: "OWNER", professionalId: null }), "p9"), true);
+    assert.equal(canViewCommissions(mk({ role: "FINANCE", professionalId: null }), "p9"), true);
+    assert.equal(canViewCommissions(mk({ role: "PROFESSIONAL", professionalId: "p1" }), "p1"), true);
+    assert.equal(canViewCommissions(mk({ role: "PROFESSIONAL", professionalId: "p1" }), "p2"), false);
+    assert.equal(canViewCommissions(mk({ role: "RECEPTIONIST", professionalId: null }), "p1"), false);
+    assert.equal(canManageCommissions(mk({ role: "OWNER" })), true);
+    assert.equal(canManageCommissions(mk({ role: "FINANCE" })), true);
+    assert.equal(canManageCommissions(mk({ role: "PROFESSIONAL" })), false);
   });
 });

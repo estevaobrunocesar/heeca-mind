@@ -13,6 +13,7 @@ import { getAppointmentInTenant } from "@/lib/tenant";
 import { dateTimeInTz } from "@/lib/time";
 import { packageSchema, reasonSchema, sellPackageSchema } from "@/lib/validation/package";
 import { registerPaymentSchema } from "@/lib/validation/payment";
+import { onPaymentRecorded, onPaymentsReverted } from "@/lib/commissions/service";
 
 // ── Catálogo (dono do perfil ou OWNER) ──────────────────────────────────────
 
@@ -114,10 +115,11 @@ export async function registerPackagePaymentAction(purchaseId: string, _prev: Fo
   if (amount <= 0) return { error: "Este pacote já está quitado.", values: formValues(formData) };
   const paidAt = d.paidAt ? dateTimeInTz(d.paidAt, "12:00", org.timezone) : new Date();
   const settled = paidSoFar + amount >= p.priceCents;
-  await db.$transaction([
+  const [payment] = await db.$transaction([
     db.payment.create({ data: { packagePurchaseId: p.id, amountCents: amount, method: d.method, paidAt, note: d.note } }),
     db.packagePurchase.update({ where: { id: p.id }, data: settled ? { paymentStatus: "PAID" } : {} }),
   ]);
+  await onPaymentRecorded(payment.id);
   await audit(actor, { organizationId: actor.organizationId, action: "payment.register", entityType: "PackagePurchase", entityId: p.id, after: { amountCents: amount, method: d.method, settled } });
   revalidatePath(`/pacientes/${p.patientId}`);
   revalidatePath("/financeiro");
@@ -139,6 +141,7 @@ export async function revertPackagePaymentAction(purchaseId: string) {
   const actor = await requireActor();
   const p = await getPurchaseInTenant(actor, purchaseId);
   if (!canViewFinancials(actor, p.professionalId)) throw new Error("Sem permissão para o financeiro");
+  await onPaymentsReverted(p.payments.map((x) => ({ id: x.id })), actor);
   await db.$transaction([
     db.payment.deleteMany({ where: { packagePurchaseId: p.id } }),
     db.packagePurchase.update({ where: { id: p.id }, data: { paymentStatus: "PENDING" } }),

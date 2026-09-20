@@ -1,5 +1,5 @@
 {
-  "name": "hecca_psico",
+  "name": "heeca_mind",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -21,7 +21,7 @@
     "check:lgpd": "tsx --conditions=react-server scripts/lgpd-check.ts",
     "rotate-key": "tsx --conditions=react-server scripts/rotate-key.ts",
     "db:deploy": "prisma migrate deploy",
-    "docker:build": "docker build -t hecca-psico ."
+    "docker:build": "docker build -t heeca-mind ."
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

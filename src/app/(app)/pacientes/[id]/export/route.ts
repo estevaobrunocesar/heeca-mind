@@ -1,5 +1,6 @@
 import { STATUS_LABEL } from "@/lib/appointment-status";
 import { db } from "@/lib/db";
+import { formatRegistration } from "@/lib/registration";
 import { canDeletePatient } from "@/lib/permissions";
 import { getActor } from "@/lib/session";
 import { formatDateTimeBR } from "@/lib/time";
@@ -24,7 +25,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/pacientes/[id]/expo
       organization: { select: { name: true, timezone: true, retentionYears: true } },
       appointments: {
         orderBy: { startsAt: "asc" },
-        include: { payments: { orderBy: { paidAt: "asc" } }, professional: { select: { displayName: true, crp: true } } },
+        include: { payments: { orderBy: { paidAt: "asc" } }, professional: { select: { displayName: true, registrationKind: true, registrationNumber: true } } },
       },
       notifications: { orderBy: { createdAt: "asc" }, select: { type: true, status: true, channel: true, sentAt: true, deliveredAt: true, readAt: true } },
     },
@@ -58,7 +59,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/pacientes/[id]/expo
       inicio: fmt(a.startsAt),
       fim: fmt(a.endsAt),
       profissional: a.professional.displayName,
-      crp: a.professional.crp,
+      registration: formatRegistration(a.professional, { force: true }),
       atendimento: a.serviceNameSnapshot,
       modalidade: a.modality === "ONLINE" ? "Online" : "Presencial",
       status: STATUS_LABEL[a.status],

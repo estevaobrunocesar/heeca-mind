@@ -45,7 +45,7 @@ async function findFreeSlug(base: string): Promise<string> {
 export async function registerAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = registerSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error, formData);
-  const { fullName, displayName, crp, email, password } = parsed.data;
+  const { fullName, displayName, registrationNumber, email, password } = parsed.data;
 
   const exists = await db.user.findUnique({ where: { email }, select: { id: true } });
   if (exists) return { fieldErrors: { email: ["Este e-mail já está cadastrado"] }, values: formValues(formData) };
@@ -67,7 +67,7 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
         userId: user.id,
         displayName,
         fullName,
-        crp,
+        registrationNumber,
         email,
         slug,
       },

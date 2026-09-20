@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { EmptyState } from "@/components/layout/empty-state";
 import { listDelegations, type DelegationView } from "@/lib/clinical";
 import { db } from "@/lib/db";
+import { formatRegistration } from "@/lib/registration";
 import { requireActor } from "@/lib/session";
 import { formatDateBR, todayCivilAndMonth } from "@/lib/time";
 import { DelegationList, GrantForm } from "./delegation-panel";
@@ -20,7 +21,7 @@ export default async function DelegationsPage() {
     db.professional.findMany({
       where: { organizationId: actor.organizationId, isActive: true, userId: { not: null }, id: { not: pid } },
       orderBy: { displayName: "asc" },
-      select: { id: true, displayName: true, crp: true },
+      select: { id: true, displayName: true, registrationKind: true, registrationNumber: true },
     }),
     // Só pacientes que o titular atende (mesma regra do prontuário).
     db.patient.findMany({
@@ -53,7 +54,7 @@ export default async function DelegationsPage() {
         </section>
       ) : (
         <GrantForm
-          professionals={professionals.map((p) => ({ value: p.id, label: `${p.displayName} · CRP ${p.crp}` }))}
+          professionals={professionals.map((p) => ({ value: p.id, label: [p.displayName, formatRegistration(p, { force: true })].filter(Boolean).join(" · ") }))}
           patients={patients.map((p) => ({ value: p.id, label: p.name }))}
           today={todayCivilAndMonth(new Date(), tz).date}
         />

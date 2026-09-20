@@ -83,7 +83,7 @@ class Session {
   }
 
   async ehlo(): Promise<string[]> {
-    const r = await this.cmd("EHLO hecca-psico", 250);
+    const r = await this.cmd("EHLO heeca-mind", 250);
     return r.lines.map((l) => l.toUpperCase());
   }
 

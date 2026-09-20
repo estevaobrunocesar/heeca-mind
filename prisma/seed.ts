@@ -42,7 +42,7 @@ async function main() {
       userId: user.id,
       displayName: "Dra. Ana Lúcia",
       fullName: "Ana Lúcia Ferreira",
-      crp: "06/123456",
+      registrationNumber: "06/123456",
       slug: "dra-ana-lucia",
       bio: "Psicóloga clínica com atuação em terapia cognitivo-comportamental para adultos. Atendimento presencial em Pinheiros e online.",
       approaches: ["TCC"],

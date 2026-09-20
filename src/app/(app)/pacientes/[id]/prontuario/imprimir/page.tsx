@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { canOpenClinicalRecord, DOCUMENT_KIND_LABEL, KIND_LABEL, listDocuments, listNotes, logExport } from "@/lib/clinical";
 import { db } from "@/lib/db";
+import { formatRegistration } from "@/lib/registration";
 import { formatBytes } from "@/lib/document";
 import { requireActor } from "@/lib/session";
 import { formatDateBR, formatDateTimeBR } from "@/lib/time";
@@ -23,10 +24,11 @@ export default async function PrintClinicalRecordPage({ params }: PageProps<"/pa
       where: { id, organizationId: actor.organizationId, anonymizedAt: null },
       select: { name: true, whatsapp: true, firstAppointmentAt: true, organization: { select: { name: true, timezone: true } } },
     }),
-    db.professional.findUniqueOrThrow({ where: { id: actor.professionalId }, select: { displayName: true, fullName: true, crp: true } }),
+    db.professional.findUniqueOrThrow({ where: { id: actor.professionalId }, select: { displayName: true, fullName: true, registrationKind: true, registrationNumber: true } }),
   ]);
   if (!patient) notFound();
   const tz = patient.organization.timezone;
+  const reg = formatRegistration(pro, { force: true }); // documento oficial: sempre exibe o registro
   const notes = (await listNotes(actor, id)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const documents = (await listDocuments(actor, id)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   await logExport(actor, id, notes.map((n) => n.id));
@@ -41,7 +43,7 @@ export default async function PrintClinicalRecordPage({ params }: PageProps<"/pa
           {patient.firstAppointmentAt && <> · desde {formatDateBR(patient.firstAppointmentAt, tz)}</>}
         </p>
         <p>
-          <strong>Profissional:</strong> {pro.fullName} ({pro.displayName}) · CRP {pro.crp} · {patient.organization.name}
+          <strong>Profissional:</strong> {pro.fullName} ({pro.displayName}){reg ? ` · ${reg}` : ""} · {patient.organization.name}
         </p>
         <p className="text-xs">
           Emitido em {formatDateTimeBR(new Date(), tz)} · {notes.length} registro(s) · {documents.length} anexo(s) · documento sigiloso (CFP, Código de Ética, art. 9)
@@ -80,7 +82,7 @@ export default async function PrintClinicalRecordPage({ params }: PageProps<"/pa
       <footer className="mt-10 border-t border-black pt-3 text-xs">
         <p>_____________________________________________</p>
         <p>
-          {pro.fullName} · CRP {pro.crp}
+          {pro.fullName}{reg ? ` · ${reg}` : ""}
         </p>
       </footer>
     </main>

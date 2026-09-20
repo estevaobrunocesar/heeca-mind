@@ -6,7 +6,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "Hecca Psico", template: "%s · Hecca Psico" },
+  title: { default: "Heeca Mind", template: "%s · Heeca Mind" },
   description: "Agenda e agendamento online para psicólogos.",
 };
 

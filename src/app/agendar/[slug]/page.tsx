@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { formatRegistration } from "@/lib/registration";
 
 /**
  * Página pública do profissional. Mobile-first, sem autenticação.
@@ -15,8 +16,9 @@ async function getPublicProfile(slug: string) {
     where: { slug, isActive: true },
     select: {
       displayName: true,
-      crp: true,
-      showCrp: true,
+      registrationKind: true,
+      registrationNumber: true,
+      showRegistration: true,
       photoUrl: true,
       bio: true,
       approaches: true,
@@ -68,7 +70,7 @@ export default async function PublicBookingPage({ params }: PageProps<"/agendar/
           </div>
         )}
         <h1 className="mt-4 text-2xl font-semibold tracking-tight">{p.displayName}</h1>
-        {p.showCrp && <p className="text-sm text-text-muted">CRP {p.crp}</p>}
+        {formatRegistration(p) && <p className="text-sm text-text-muted">{formatRegistration(p)}</p>}
         {location && <p className="mt-1 text-sm text-text-muted">{location}</p>}
       </header>
 

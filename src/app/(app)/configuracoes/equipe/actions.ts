@@ -66,9 +66,9 @@ export async function inviteMemberAction(_prev: FormState, formData: FormData): 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   await sendEmail({
     to: email,
-    subject: `Convite para ${org.name} — Hecca Psico`,
+    subject: `Convite para ${org.name} — Heeca Mind`,
     text:
-      `Você foi convidado(a) para fazer parte de ${org.name} no Hecca Psico como ${role === "PROFESSIONAL" ? "psicólogo(a)" : "recepção"}.\n\n` +
+      `Você foi convidado(a) para fazer parte de ${org.name} no Heeca Mind como ${role === "PROFESSIONAL" ? "psicólogo(a)" : "recepção"}.\n\n` +
       `Aceite o convite (válido por 7 dias):\n${base}/convite/${token}\n`,
   });
 

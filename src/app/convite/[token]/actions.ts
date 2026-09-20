@@ -6,6 +6,7 @@ import { signIn } from "@/auth";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { formValues, invalid, type FormState } from "@/lib/form";
+import { DEFAULT_REGISTRATION_BY_SEGMENT, registrationSpec } from "@/lib/registration";
 import { slugify } from "@/lib/slug";
 import { acceptInviteSchema } from "@/lib/validation/team";
 
@@ -17,7 +18,7 @@ export async function findInvitation(token: string) {
   if (token.length < 20) return null;
   return db.invitation.findFirst({
     where: { tokenHash: hashToken(token), acceptedAt: null, expiresAt: { gt: new Date() } },
-    include: { organization: { select: { id: true, name: true } } },
+    include: { organization: { select: { id: true, name: true, segment: true } } },
   });
 }
 
@@ -43,12 +44,13 @@ export async function acceptInviteAction(_prev: FormState, formData: FormData): 
   if (!inv) return { error: "Convite inválido ou expirado. Peça um novo ao responsável." };
 
   const fieldErrors: Record<string, string[]> = {};
-  let crp: string | null = null;
+  // O convidado herda o tipo de registro do segmento da organização.
+  const spec = registrationSpec(DEFAULT_REGISTRATION_BY_SEGMENT[inv.organization.segment]);
+  let registrationNumber: string | null = null;
   if (inv.role === "PROFESSIONAL") {
     if (d.displayName.length < 2) fieldErrors.displayName = ["Informe como quer ser chamado(a)"];
-    const digits = d.crp.replace(/\D/g, "");
-    if (digits.length < 6 || digits.length > 8) fieldErrors.crp = ["CRP inválido"];
-    else crp = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    registrationNumber = spec.normalize(d.registrationNumber);
+    if (registrationNumber === null) fieldErrors.registrationNumber = [spec.invalidMessage];
   }
   if (Object.keys(fieldErrors).length) return { fieldErrors, values: formValues(formData) };
 
@@ -64,7 +66,7 @@ export async function acceptInviteAction(_prev: FormState, formData: FormData): 
     await tx.membership.create({ data: { userId: user.id, organizationId: inv.organizationId, role: inv.role } });
     if (inv.role === "PROFESSIONAL") {
       const pro = await tx.professional.create({
-        data: { organizationId: inv.organizationId, userId: user.id, displayName: d.displayName, fullName: d.fullName, crp: crp!, email: inv.email, slug: slug! },
+        data: { organizationId: inv.organizationId, userId: user.id, displayName: d.displayName, fullName: d.fullName, registrationKind: spec.kind, registrationNumber, email: inv.email, slug: slug! },
       });
       await tx.scheduleSettings.create({ data: { professionalId: pro.id } });
       await tx.professionalPolicy.create({ data: { professionalId: pro.id } });

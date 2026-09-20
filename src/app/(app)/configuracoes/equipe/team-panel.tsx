@@ -46,7 +46,7 @@ export function InviteForm() {
       <div>
         <h2 className="text-base font-semibold">Convidar para a equipe</h2>
         <p className="mt-1 text-sm text-text-muted">
-          A pessoa recebe um link por e-mail, cria a própria senha e, se for psicólogo(a), preenche CRP e nome profissional. Recepção vê agenda e
+          A pessoa recebe um link por e-mail, cria a própria senha e, se for profissional, preenche o registro (CRP) e o nome profissional. Recepção vê agenda e
           pacientes, mas não valores nem configurações.
         </p>
       </div>

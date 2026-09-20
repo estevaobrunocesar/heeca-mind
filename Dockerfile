@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Hecca Psico — imagem de produção (Next.js standalone + Prisma)
+# Heeca Mind — imagem de produção (Next.js standalone + Prisma)
 
 FROM node:24-alpine AS base
 RUN apk add --no-cache libc6-compat openssl

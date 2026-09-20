@@ -14,7 +14,7 @@ export default async function InvitePage({ params }: PageProps<"/convite/[token]
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-xl font-semibold text-primary">H</div>
-          <h1 className="text-2xl font-semibold tracking-tight">Hecca Psico</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Heeca Mind</h1>
         </div>
         <div className="card">
           {!inv ? (

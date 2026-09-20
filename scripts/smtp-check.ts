@@ -70,7 +70,7 @@ async function main() {
 
   if (process.env.SMTP_URL && process.env.SMTP_CHECK_TO) {
     const real = new SmtpEmailProvider();
-    const r = await real.send({ to: process.env.SMTP_CHECK_TO, subject: "Hecca Psico — teste de SMTP", text: "Se você recebeu isto, o SMTP_URL está correto." });
+    const r = await real.send({ to: process.env.SMTP_CHECK_TO, subject: "Heeca Mind — teste de SMTP", text: "Se você recebeu isto, o SMTP_URL está correto." });
     checks.push([`servidor real (${process.env.SMTP_CHECK_TO})`, r.ok]);
     if (!r.ok) console.error("  ", r.error);
   }

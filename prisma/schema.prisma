@@ -1,4 +1,4 @@
-// Hecca Psico — schema multi-tenant
+// Heeca Mind — schema multi-tenant
 //
 // Convenções:
 //  - Todo dado de negócio pertence a uma Organization (tenant). Queries devem
@@ -26,12 +26,20 @@ enum OrganizationType {
   CLINIC // clínica com vários profissionais
 }
 
+/// Segmento do tenant (docs/mind/01-ARQUITETURA.md §6). O MVP exibe só PSYCHOLOGY;
+/// decide o tipo de registro profissional padrão (src/lib/registration.ts).
+enum Segment {
+  PSYCHOLOGY
+  THERAPY
+}
+
 model Organization {
   id             String           @id @default(cuid())
   name           String
   type           OrganizationType @default(SOLO)
   slug           String?          @unique // página pública da clínica: /clinica/<slug>
   timezone       String           @default("America/Sao_Paulo")
+  segment        Segment          @default(PSYCHOLOGY)
   /// Anos de guarda após o último atendimento/exclusão antes de anonimizar (CFP: mínimo 5).
   retentionYears Int              @default(5)
   createdAt      DateTime         @default(now())
@@ -195,8 +203,11 @@ model Professional {
   // Identidade profissional
   displayName String // "Dra. Ana"
   fullName    String
-  crp         String // dado profissional — exibido só onde o profissional autorizar
-  showCrp     Boolean  @default(true)
+  // Registro no conselho (CRP, CRN, CRFa…) — src/lib/registration.ts. Nulo quando o
+  // perfil foi criado pelo provisionamento do portal e ainda não foi preenchido.
+  registrationKind   String  @default("CRP")
+  registrationNumber String? // exibido só onde o profissional autorizar
+  showRegistration   Boolean @default(true)
   photoUrl    String? // URL pública (nossa ou externa)
   photoKey    String? // chave no storage quando a foto foi enviada por nós — permite apagar
   bio         String?

@@ -47,7 +47,7 @@ const schema = z
     }
     if (e.EMAIL_DRIVER === "smtp") need(!!e.SMTP_URL && /^smtps?:\/\//.test(e.SMTP_URL), "SMTP_URL", "EMAIL_DRIVER=smtp exige SMTP_URL (smtp://usuario:senha@host:porta ou smtps://…)");
     if (e.EMAIL_DRIVER === "resend") need(!!e.RESEND_API_KEY, "RESEND_API_KEY", "EMAIL_DRIVER=resend exige RESEND_API_KEY");
-    if (e.EMAIL_DRIVER !== "console") need(!!e.EMAIL_FROM && e.EMAIL_FROM.includes("@"), "EMAIL_FROM", "defina o remetente, ex.: Hecca Psico <no-reply@seudominio.com.br>");
+    if (e.EMAIL_DRIVER !== "console") need(!!e.EMAIL_FROM && e.EMAIL_FROM.includes("@"), "EMAIL_FROM", "defina o remetente, ex.: Heeca Mind <no-reply@seudominio.com.br>");
     if (e.STORAGE_DRIVER === "s3") {
       need(!!e.S3_BUCKET && !!e.S3_ACCESS_KEY_ID && !!e.S3_SECRET_ACCESS_KEY, "S3_BUCKET", "STORAGE_DRIVER=s3 exige S3_BUCKET, S3_ACCESS_KEY_ID e S3_SECRET_ACCESS_KEY");
     }

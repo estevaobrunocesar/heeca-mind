@@ -24,7 +24,7 @@ export const acceptInviteSchema = z
     password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres").max(128),
     // Só para PROFESSIONAL — validados no servidor conforme o papel do convite.
     displayName: z.string().trim().max(60),
-    crp: z.string().trim(),
+    registrationNumber: z.string().trim(),
   });
 
 export const ROLE_LABEL = { OWNER: "Responsável", PROFESSIONAL: "Psicólogo(a)", RECEPTIONIST: "Recepção" } as const;

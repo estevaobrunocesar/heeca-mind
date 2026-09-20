@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { checkbox } from "./common";
+import { registrationField } from "./registration";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { hhmmToMinutes, isHHmm } from "@/lib/time";
 
@@ -47,13 +48,8 @@ const tagList = z
 export const profileSchema = z.object({
   displayName: z.string().trim().min(2, "Informe o nome profissional").max(60),
   fullName: z.string().trim().min(3, "Informe o nome completo").max(120),
-  crp: z
-    .string()
-    .trim()
-    .transform((v) => v.replace(/\D/g, ""))
-    .refine((v) => v.length >= 6 && v.length <= 8, "CRP inválido")
-    .transform((v) => `${v.slice(0, 2)}/${v.slice(2)}`),
-  showCrp: checkbox,
+  registrationNumber: registrationField("CRP"),
+  showRegistration: checkbox,
   bio: optionalText(1200),
   approaches: tagList,
   specialties: tagList,

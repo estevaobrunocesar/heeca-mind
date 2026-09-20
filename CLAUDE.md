@@ -1,6 +1,6 @@
-# Hecca Psico
+# Heeca Mind
 
-SaaS multi-tenant de agenda e agendamento online para psicólogos. Spec completa em `docs/SPEC.md`.
+Vertical de saúde mental da plataforma Heeca (antes "Hecca Psico"; o produto foi rebatizado em 20/09/2026 e está sendo integrado ao Core — portal, Notify, R2). Spec original em `docs/SPEC.md`; arquitetura, ERD, fluxos, plano e decisões do Mind em `docs/mind/` (comece pelo `docs/mind/README.md`; decisões D1–D9 fechadas em 20/09 conforme as recomendações do `06-GAPS-E-PLANO.md`).
 
 ## Stack
 
@@ -60,6 +60,12 @@ prisma/                schema, migrations, seed
 | 8 Dashboard | ✅ sessões do dia, próxima, pacientes ativos, confirmadas, pendentes, cancelamentos, reagendamentos, online/presencial, faturamento, comparecimento |
 | 9 Financeiro | ✅ pagamento (parcial/integral/isento/desfazer) na sessão, /financeiro por mês com realizado/recebido/a receber/previsto, marcar pago em 1 clique, CSV |
 
+## Segmento e registro profissional (Mind, etapa 0)
+
+- `Organization.segment` (`PSYCHOLOGY` | `THERAPY`, default PSYCHOLOGY) decide o tipo de registro padrão. O MVP só exibe Psicologia; não criar telas de segmento agora.
+- `Professional.registrationKind` (`CRP` | `CRN` | `CRFa` | `NONE`) + `registrationNumber` (nulo = perfil provisionado pelo portal e ainda não preenchido) substituem o antigo `crp`. Regras puras em `src/lib/registration.ts` (testado); formulários usam `registrationField(kind)` de `src/lib/validation/registration.ts`. **Nunca** formatar "CRP …" à mão: telas chamam `formatRegistration(p)` (respeita `showRegistration`) e documentos oficiais `formatRegistration(p, { force: true })`.
+- Convite de equipe herda o tipo de registro do segmento da organização (`DEFAULT_REGISTRATION_BY_SEGMENT`).
+
 ## Padrões de formulário
 
 - Server Actions com `useActionState`; estado tipado como `FormState` (`src/lib/form.ts`).
@@ -116,7 +122,7 @@ prisma/                schema, migrations, seed
 ## Storage de arquivos
 
 - `src/lib/storage/`: interface `StorageProvider`, drivers `local` (public/uploads, dev e VPS) e `s3` (SigV4 manual, testado contra o vetor da AWS; funciona com S3/R2/MinIO). `STORAGE_DRIVER` escolhe.
-- Toda chave leva o prefixo `hecca-psico/` — o bucket pode ser compartilhado entre os produtos Heeca.
+- Toda chave leva o prefixo `mind/` (`KEY_PREFIX`). Em produção o bucket é exclusivo do produto (`heeca-mind`, regra "cada produto é individual" da plataforma).
 - Foto de perfil: recorte quadrado + resize 512px no navegador (canvas, sem `sharp`); servidor valida magic bytes (`src/lib/image.ts`) e 1,5 MB. SVG é recusado (pode carregar script). Chave com timestamp → cache imutável; a anterior é apagada em melhor esforço. `Professional.photoKey` guarda a chave para exclusão.
 - Server Actions aceitam até 10 MB (`next.config.ts`) — documentos clínicos vão até 8 MB.
 - **Objetos privados** (`putPrivate/getPrivate/deletePrivate`): nunca ganham URL. Driver local grava em `storage/private/` (fora de `public/`; `PRIVATE_STORAGE_DIR` aponta o volume em produção); S3 usa o mesmo bucket com `cache-control: private, no-store`. O chamador grava o conteúdo **já cifrado** — a confidencialidade vem da chave, não do bucket.
@@ -149,7 +155,7 @@ prisma/                schema, migrations, seed
 
 - Papéis: OWNER (tudo), PROFESSIONAL (só o próprio perfil/agenda/valores), RECEPTIONIST (agenda e pacientes de qualquer profissional; nunca valores, configurações ou equipe). `canViewAnyFinancials` esconde valores da recepção em telas cruzadas (menu, ficha do paciente).
 - Seletor de profissional: cookie `hp_pro` (`setActiveProfessionalAction`), validado no tenant a cada requisição em `resolveActiveProfessional`. PROFESSIONAL ignora o cookie.
-- Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com CRP/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.
+- Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com registro profissional/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.
 - Página pública da clínica: `/clinica/[slug]` (Organization.slug) lista profissionais ativos → `/agendar/[slug]`.
 - Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica`.
 - Migrações com aviso interativo (índice único): `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` para a pasta e `prisma migrate deploy`.

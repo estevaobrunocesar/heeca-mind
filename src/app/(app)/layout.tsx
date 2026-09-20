@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar userName={user.name} publicUrl={publicUrl} orgName={org.type === "CLINIC" ? org.name : null} hideFinance={hideFinance} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between gap-4 border-b border-border bg-surface px-4 md:px-6">
-          <span className="font-semibold md:hidden">Hecca Psico</span>
+          <span className="font-semibold md:hidden">Heeca Mind</span>
           <div className="flex flex-1 items-center justify-end gap-4">
             {showSwitcher && (
               <ProfessionalSwitcher options={professionals.map((p) => ({ id: p.id, label: p.displayName }))} activeId={actor.activeProfessionalId} />

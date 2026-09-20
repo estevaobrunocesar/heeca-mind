@@ -107,12 +107,12 @@ async function build(input: ProEventInput): Promise<Built | null> {
 
 function render(b: Built, event: ProEvent, proName: string): { text: string; html: string } {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-  const text = [`Olá, ${proName}.`, "", ...b.lines, "", `Abrir: ${b.link}`, "", "— Hecca Psico", unsubscribeHint(event)].join("\n");
+  const text = [`Olá, ${proName}.`, "", ...b.lines, "", `Abrir: ${b.link}`, "", "— Heeca Mind", unsubscribeHint(event)].join("\n");
   const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;color:#222;max-width:560px">
 <p>Olá, ${esc(proName)}.</p>
 ${b.lines.map((l) => `<p>${esc(l)}</p>`).join("\n")}
-<p><a href="${esc(b.link)}" style="display:inline-block;background:#3f6b4e;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px">Abrir no Hecca Psico</a></p>
-<p style="color:#777;font-size:12px">— Hecca Psico<br>${esc(unsubscribeHint(event))}</p>
+<p><a href="${esc(b.link)}" style="display:inline-block;background:#3f6b4e;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px">Abrir no Heeca Mind</a></p>
+<p style="color:#777;font-size:12px">— Heeca Mind<br>${esc(unsubscribeHint(event))}</p>
 </div>`;
   return { text, html };
 }

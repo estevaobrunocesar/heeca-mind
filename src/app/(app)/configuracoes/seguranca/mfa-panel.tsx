@@ -22,10 +22,10 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
           type="button"
           className="btn-ghost"
           onClick={() => {
-            const blob = new Blob([`Hecca Psico — códigos de recuperação\n\n${codes.join("\n")}\n`], { type: "text/plain" });
+            const blob = new Blob([`Heeca Mind — códigos de recuperação\n\n${codes.join("\n")}\n`], { type: "text/plain" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "hecca-psico-codigos-recuperacao.txt";
+            a.download = "heeca-mind-codigos-recuperacao.txt";
             a.click();
             URL.revokeObjectURL(a.href);
           }}

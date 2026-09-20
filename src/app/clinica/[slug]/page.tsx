@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { formatRegistration } from "@/lib/registration";
 
 /** Página pública da clínica: lista os profissionais com página de agendamento. Só campos públicos. */
 async function load(slug: string) {
@@ -12,7 +13,7 @@ async function load(slug: string) {
       professionals: {
         where: { isActive: true },
         orderBy: { createdAt: "asc" },
-        select: { slug: true, displayName: true, crp: true, showCrp: true, photoUrl: true, bio: true, approaches: true, specialties: true, addressCity: true, services: { where: { isActive: true }, select: { modality: true } } },
+        select: { slug: true, displayName: true, registrationKind: true, registrationNumber: true, showRegistration: true, photoUrl: true, bio: true, approaches: true, specialties: true, addressCity: true, services: { where: { isActive: true }, select: { modality: true } } },
       },
     },
   });
@@ -51,8 +52,8 @@ export default async function ClinicPage({ params }: PageProps<"/clinica/[slug]"
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{p.displayName}</p>
                   <p className="text-xs text-text-muted">
-                    {p.showCrp && `CRP ${p.crp}`}
-                    {p.showCrp && (mod || p.addressCity) && " · "}
+                    {formatRegistration(p)}
+                    {formatRegistration(p) && (mod || p.addressCity) && " · "}
                     {[mod, p.addressCity].filter(Boolean).join(" · ")}
                   </p>
                   {(p.approaches.length > 0 || p.specialties.length > 0) && (

@@ -10,7 +10,7 @@ import {
   verifyTotp,
 } from "./totp";
 
-export const MFA_ISSUER = "Hecca Psico";
+export const MFA_ISSUER = "Heeca Mind";
 
 /**
  * Passo 1 da ativação: gera e guarda (cifrado) um segredo provisório. Só

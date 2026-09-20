@@ -124,7 +124,7 @@ export async function applyEntitlement(e: Entitlement) {
 }
 
 export type SsoResolution =
-  | { ok: true; user: { id: string; email: string; name: string; organizationId: string; role: "OWNER" | "PROFESSIONAL" | "RECEPTIONIST"; professionalId: string | null; mfaEnabled: boolean } }
+  | { ok: true; user: { id: string; email: string; name: string; organizationId: string; role: "OWNER" | "PROFESSIONAL" | "RECEPTIONIST" | "FINANCE"; professionalId: string | null; mfaEnabled: boolean } }
   | { ok: false; error: string };
 
 /**

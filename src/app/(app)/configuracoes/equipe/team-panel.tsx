@@ -60,6 +60,7 @@ export function InviteForm() {
           options={[
             { value: "PROFESSIONAL", label: ROLE_LABEL.PROFESSIONAL },
             { value: "RECEPTIONIST", label: ROLE_LABEL.RECEPTIONIST },
+            { value: "FINANCE", label: ROLE_LABEL.FINANCE },
           ]}
           defaultValue={state.values?.role ?? "PROFESSIONAL"}
           errors={state.fieldErrors?.role}
@@ -110,6 +111,7 @@ export function TeamList({ members, invites }: { members: Member[]; invites: Inv
                   >
                     {m.hasProfile && <option value="PROFESSIONAL">{ROLE_LABEL.PROFESSIONAL}</option>}
                     <option value="RECEPTIONIST">{ROLE_LABEL.RECEPTIONIST}</option>
+                    <option value="FINANCE">{ROLE_LABEL.FINANCE}</option>
                     <option value="OWNER">{ROLE_LABEL.OWNER}</option>
                   </select>
                   <button

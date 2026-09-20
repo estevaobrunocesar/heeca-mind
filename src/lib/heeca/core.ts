@@ -121,9 +121,11 @@ export function accessStateOf(e: Pick<Entitlement, "access" | "status">): Access
   return "OK";
 }
 
-/** Papel do portal → papel local. BILLING vira FINANCE quando esse papel existir (etapa 2). */
-export function membershipRoleFor(portalRole: string): "OWNER" | "RECEPTIONIST" {
-  return portalRole === "OWNER" || portalRole === "ADMIN" ? "OWNER" : "RECEPTIONIST";
+/** Papel do portal → papel local. */
+export function membershipRoleFor(portalRole: string): "OWNER" | "RECEPTIONIST" | "FINANCE" {
+  if (portalRole === "OWNER" || portalRole === "ADMIN") return "OWNER";
+  if (portalRole === "BILLING") return "FINANCE";
+  return "RECEPTIONIST";
 }
 
 /** Só caminhos relativos internos; nada de `//evil.com` nem esquemas. */

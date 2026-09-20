@@ -6,7 +6,7 @@ import { audit } from "@/lib/audit";
 import { ACTIVE_STATUSES } from "@/lib/availability-data";
 import { db } from "@/lib/db";
 import { formValues, invalid, type FormState } from "@/lib/form";
-import { canDeletePatient } from "@/lib/permissions";
+import { canDeletePatient, canManagePatients } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { assertPatientInTenant } from "@/lib/tenant";
 import { patientSchema } from "@/lib/validation/patient";
@@ -22,6 +22,7 @@ async function whatsappTaken(organizationId: string, whatsapp: string, exceptId?
 
 export async function createPatientAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireActor();
+  if (!canManagePatients(actor)) return { error: "Sem permissão para cadastrar pacientes." };
   const parsed = patientSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error, formData);
   const d = parsed.data;
@@ -45,6 +46,7 @@ export async function createPatientAction(_prev: FormState, formData: FormData):
 
 export async function updatePatientAction(patientId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireActor();
+  if (!canManagePatients(actor)) return { error: "Sem permissão para editar pacientes." };
   await assertPatientInTenant(actor, patientId);
   const parsed = patientSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return invalid(parsed.error, formData);

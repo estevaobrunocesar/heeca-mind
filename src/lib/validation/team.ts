@@ -3,7 +3,7 @@ import { SLUG_PATTERN } from "@/lib/slug";
 
 export const inviteSchema = z.object({
   email: z.string().trim().toLowerCase().email("E-mail inválido"),
-  role: z.enum(["PROFESSIONAL", "RECEPTIONIST"], { message: "Escolha o papel" }),
+  role: z.enum(["PROFESSIONAL", "RECEPTIONIST", "FINANCE"], { message: "Escolha o papel" }),
 });
 
 export const clinicSchema = z.object({
@@ -27,4 +27,4 @@ export const acceptInviteSchema = z
     registrationNumber: z.string().trim(),
   });
 
-export const ROLE_LABEL = { OWNER: "Responsável", PROFESSIONAL: "Psicólogo(a)", RECEPTIONIST: "Recepção" } as const;
+export const ROLE_LABEL = { OWNER: "Responsável", PROFESSIONAL: "Profissional", RECEPTIONIST: "Recepção", FINANCE: "Financeiro" } as const;

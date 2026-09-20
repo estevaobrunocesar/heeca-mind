@@ -59,7 +59,7 @@ describe("mapeamentos", () => {
   it("membershipRoleFor: OWNER/ADMIN → OWNER; demais → RECEPTIONIST", () => {
     assert.equal(membershipRoleFor("OWNER"), "OWNER");
     assert.equal(membershipRoleFor("ADMIN"), "OWNER");
-    assert.equal(membershipRoleFor("BILLING"), "RECEPTIONIST");
+    assert.equal(membershipRoleFor("BILLING"), "FINANCE");
     assert.equal(membershipRoleFor("MEMBER"), "RECEPTIONIST");
   });
   it("safeNextPath só aceita caminho interno", () => {

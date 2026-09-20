@@ -238,6 +238,10 @@ export async function requestConfirmationAction(appointmentId: string) {
   await enqueueAppointmentNotification(appointmentId, "BOOKING_REQUEST");
 }
 
+export async function startAppointmentAction(appointmentId: string) {
+  await transition(appointmentId, "start");
+}
+
 export async function completeAppointmentAction(appointmentId: string) {
   await transition(appointmentId, "complete", { completedAt: new Date() });
 }

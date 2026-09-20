@@ -11,6 +11,7 @@ import type { AppointmentStatus } from "@/generated/prisma/enums";
 export type AppointmentAction =
   | "confirm" // -> CONFIRMED
   | "request_confirmation" // -> AWAITING_CONFIRMATION (envia WhatsApp)
+  | "start" // -> IN_PROGRESS (paciente chegou / sessão começou)
   | "cancel_by_professional" // -> CANCELLED_BY_PROFESSIONAL
   | "cancel_by_patient" // -> CANCELLED_BY_PATIENT (registrado pela recepção)
   | "complete" // -> COMPLETED
@@ -23,6 +24,7 @@ const TRANSITIONS: Record<AppointmentAction, { from: AppointmentStatus[]; to: Ap
     to: "CONFIRMED",
   },
   request_confirmation: { from: ["PENDING"], to: "AWAITING_CONFIRMATION" },
+  start: { from: ["CONFIRMED", "PENDING", "AWAITING_CONFIRMATION"], to: "IN_PROGRESS" },
   cancel_by_professional: {
     from: ["PENDING", "AWAITING_CONFIRMATION", "CONFIRMED", "RESCHEDULE_REQUESTED", "AWAITING_PAYMENT"],
     to: "CANCELLED_BY_PROFESSIONAL",
@@ -31,7 +33,7 @@ const TRANSITIONS: Record<AppointmentAction, { from: AppointmentStatus[]; to: Ap
     from: ["PENDING", "AWAITING_CONFIRMATION", "CONFIRMED", "RESCHEDULE_REQUESTED", "AWAITING_PAYMENT"],
     to: "CANCELLED_BY_PATIENT",
   },
-  complete: { from: ["CONFIRMED", "PENDING", "AWAITING_CONFIRMATION"], to: "COMPLETED" },
+  complete: { from: ["IN_PROGRESS", "CONFIRMED", "PENDING", "AWAITING_CONFIRMATION"], to: "COMPLETED" },
   no_show: { from: ["CONFIRMED", "PENDING", "AWAITING_CONFIRMATION"], to: "NO_SHOW" },
   reschedule: {
     from: ["PENDING", "AWAITING_CONFIRMATION", "CONFIRMED", "RESCHEDULE_REQUESTED"],
@@ -55,6 +57,7 @@ export const STATUS_LABEL: Record<AppointmentStatus, string> = {
   PENDING: "Pendente",
   AWAITING_CONFIRMATION: "Aguardando confirmação",
   CONFIRMED: "Confirmado",
+  IN_PROGRESS: "Em atendimento",
   CANCELLED_BY_PATIENT: "Cancelado pelo paciente",
   CANCELLED_BY_PROFESSIONAL: "Cancelado pelo profissional",
   RESCHEDULE_REQUESTED: "Reagendamento solicitado",
@@ -69,6 +72,7 @@ export const STATUS_TONE: Record<AppointmentStatus, "neutral" | "warning" | "suc
   PENDING: "warning",
   AWAITING_CONFIRMATION: "warning",
   CONFIRMED: "success",
+  IN_PROGRESS: "success",
   CANCELLED_BY_PATIENT: "muted",
   CANCELLED_BY_PROFESSIONAL: "muted",
   RESCHEDULE_REQUESTED: "warning",

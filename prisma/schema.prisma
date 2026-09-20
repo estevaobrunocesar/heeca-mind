@@ -85,6 +85,7 @@ enum MembershipRole {
   OWNER // dono da conta / clínica
   PROFESSIONAL // psicólogo
   RECEPTIONIST // secretaria: agenda e contatos, sem acesso clínico
+  FINANCE // financeiro: valores, pagamentos e comissões; agenda e pacientes só leitura; sem acesso clínico
 }
 
 model User {
@@ -467,6 +468,7 @@ enum AppointmentStatus {
   PENDING // solicitado, aguardando ação
   AWAITING_CONFIRMATION // mensagem enviada, aguardando paciente
   CONFIRMED
+  IN_PROGRESS // atendimento em andamento (§9 do briefing)
   CANCELLED_BY_PATIENT
   CANCELLED_BY_PROFESSIONAL
   RESCHEDULE_REQUESTED

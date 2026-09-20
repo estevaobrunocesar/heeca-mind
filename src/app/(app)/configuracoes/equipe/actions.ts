@@ -9,7 +9,7 @@ import { formValues, invalid, type FormState } from "@/lib/form";
 import { canManageMembers } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { revokeAllSessions } from "@/lib/sessions";
-import { clinicSchema, inviteSchema } from "@/lib/validation/team";
+import { clinicSchema, inviteSchema, ROLE_LABEL } from "@/lib/validation/team";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -68,7 +68,7 @@ export async function inviteMemberAction(_prev: FormState, formData: FormData): 
     to: email,
     subject: `Convite para ${org.name} — Heeca Mind`,
     text:
-      `Você foi convidado(a) para fazer parte de ${org.name} no Heeca Mind como ${role === "PROFESSIONAL" ? "psicólogo(a)" : "recepção"}.\n\n` +
+      `Você foi convidado(a) para fazer parte de ${org.name} no Heeca Mind como ${ROLE_LABEL[role].toLowerCase()}.\n\n` +
       `Aceite o convite (válido por 7 dias):\n${base}/convite/${token}\n`,
   });
 
@@ -86,7 +86,7 @@ export async function cancelInviteAction(invitationId: string) {
   revalidatePath("/configuracoes/equipe");
 }
 
-export async function changeRoleAction(membershipId: string, role: "PROFESSIONAL" | "RECEPTIONIST" | "OWNER") {
+export async function changeRoleAction(membershipId: string, role: "PROFESSIONAL" | "RECEPTIONIST" | "FINANCE" | "OWNER") {
   const actor = await owner();
   const m = await db.membership.findFirst({ where: { id: membershipId, organizationId: actor.organizationId }, include: { user: { select: { professional: { select: { id: true } } } } } });
   if (!m) return;

@@ -19,8 +19,9 @@ const optionalText = (max: number) =>
 export const createAppointmentSchema = z
   .object({
     patientId: z.string().trim().transform((v) => (v === "" ? null : v)),
-    newPatientName: z.string().trim().max(120),
-    newPatientWhatsapp: brPhone,
+    // Em modo "Já cadastrado" o formulário não envia estes campos: ausência = vazio.
+    newPatientName: z.string().optional().transform((v) => v ?? "").pipe(z.string().trim().max(120)),
+    newPatientWhatsapp: z.string().optional().transform((v) => v ?? "").pipe(brPhone),
     serviceId: z.string().min(1, "Escolha o serviço"),
     modality: z.enum(["IN_PERSON", "ONLINE"], { message: "Escolha a modalidade" }),
     date: isoDate,

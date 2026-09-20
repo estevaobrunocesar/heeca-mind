@@ -48,7 +48,7 @@
 | 5 Portal do paciente | ✅ | 1d86511 |
 | 6 Comissões | ✅ | fc3d432 |
 | 7 Dashboard, relatórios, reativação, pesquisa | ✅ | 5419f01 |
-| 8 Endurecimento | ✅ | `check:tenant`, `check:lgpd`, dump-grep, build; E2E Playwright fica como dívida (§7 abaixo) |
+| 8 Endurecimento | ✅ | `check:tenant`, `check:lgpd`, dump-grep, build; E2E Playwright (`npm run e2e`, 6 specs) entregue depois do merge |
 
 O que **depende da plataforma** para o Mind ir ao ar está em `docs/DEPLOY.md` §5 e na seção 8 deste documento.
 
@@ -131,6 +131,8 @@ Todas implementadas conforme a coluna "Recomendação", exceto D7 (cor do produt
 ## 6. Ajustes de rota feitos durante a execução (não previstos no plano)
 
 - `heeca_lembrete` unificado tem botões quick_reply → sessões criadas manualmente ganham `confirmationToken` sob demanda ao enfileirar (bug real pego no E2E da etapa 5).
+- `/agenda/novo` em modo "Já cadastrado" não envia `newPatientName`/`newPatientWhatsapp`; o schema exigia string → erro em campos não renderizados e formulário mudo. Corrigido em `validation/appointment.ts` (ausência = vazio) com teste unitário; pego pela suíte E2E (`03-recorrencia`).
+- Cliente Prisma gerado passa a ser CJS (`moduleFormat = "cjs"`): o transpilador do Playwright carrega TS como CommonJS e o `import.meta` do cliente ESM quebrava as fixtures. Next/tsx indiferentes.
 - Portal do paciente é por slug do profissional (`/portal/<slug>`): é o que dá o tenant; a sessão vale para a organização inteira.
 - "PDF" de documentos = página de impressão com hash (padrão do prontuário e do Dental); sem dependência de geração de PDF.
 - Pacotes e documentos pertencem ao profissional (coerente com D1); `FormTemplate` administrativos antigos continuam válidos como questionários.
@@ -138,7 +140,6 @@ Todas implementadas conforme a coluna "Recomendação", exceto D7 (cor do produt
 
 ## 7. Dívidas conhecidas (não bloqueiam o §41)
 
-- E2E Playwright (as 5 jornadas do `07-TESTES.md`) — hoje a verificação é manual no navegador + `check:*`.
 - Logo da clínica: coluna existe, upload não.
 - Cor de acento do Mind (D7).
 

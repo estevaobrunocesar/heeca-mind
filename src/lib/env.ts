@@ -13,6 +13,8 @@ const base64Key = z
 const schema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    /** Só o Playwright define (`next start` local em http). Nunca setar em deploy. */
+    E2E: z.enum(["1"]).optional(),
     DATABASE_URL: z.string().url("deve ser uma URL postgresql://"),
     AUTH_SECRET: z.string().min(32, "mínimo de 32 caracteres (openssl rand -base64 32)"),
     ENCRYPTION_KEY: base64Key,
@@ -44,7 +46,7 @@ const schema = z
       if (!cond) ctx.addIssue({ code: "custom", path: [path], message });
     };
     if (prod) {
-      need(e.NEXT_PUBLIC_APP_URL.startsWith("https://"), "NEXT_PUBLIC_APP_URL", "em produção precisa ser https://");
+      need(e.E2E === "1" || e.NEXT_PUBLIC_APP_URL.startsWith("https://"), "NEXT_PUBLIC_APP_URL", "em produção precisa ser https://");
       need(!!e.CRON_SECRET, "CRON_SECRET", "obrigatório em produção (protege /api/cron)");
       need(e.AUTH_SECRET !== "troque-me" && e.ENCRYPTION_KEY !== "troque-me", "AUTH_SECRET", "troque os valores de exemplo");
     }

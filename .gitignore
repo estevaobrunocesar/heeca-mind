@@ -47,3 +47,7 @@ public/uploads/
 
 # documentos clínicos do driver local (cifrados, mas fora do repositório)
 storage/
+
+# playwright
+/test-results/
+/playwright-report/

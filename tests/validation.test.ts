@@ -54,3 +54,15 @@ describe("paciente novo exige nome e WhatsApp", () => {
     assert.ok(paths.includes("newPatientWhatsapp"));
   });
 });
+
+describe("paciente já cadastrado (modo 'Já cadastrado' não envia campos de paciente novo)", () => {
+  it("aceita newPatientName/newPatientWhatsapp ausentes quando patientId vem preenchido", () => {
+    const r = createAppointmentSchema.safeParse({
+      patientId: "pat_1", serviceId: "x", modality: "ONLINE", date: "2026-09-22", time: "10:00",
+      adminNote: "", recurrence: "WEEKLY", recurrenceUntil: "2026-10-13",
+    });
+    assert.ok(r.success, JSON.stringify(r.error?.issues));
+    assert.equal(r.data.newPatientName, "");
+    assert.equal(r.data.newPatientWhatsapp, null);
+  });
+});

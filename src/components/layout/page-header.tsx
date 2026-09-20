@@ -8,9 +8,10 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-start justify-between gap-4">
+    // Título leve (peso 400) na cor do produto + regra fina — ../ui/layout.md
+    <div className="mb-6 flex items-start justify-between gap-4 border-b border-border pb-4">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-2xl font-normal tracking-tight text-primary">{title}</h1>
         {description && <p className="mt-1 text-sm text-text-muted">{description}</p>}
       </div>
       {actions}

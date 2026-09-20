@@ -1,25 +1,32 @@
 @import "tailwindcss";
 
 /*
- * Tokens de design — Heeca Mind
- * Paleta: sálvia + areia + carvão quente. Acolhedora, discreta, sem "azul de SaaS".
+ * Tokens de design — Heeca Mind, layout "clean" da plataforma (../ui/layout.md, "Mapa por app").
+ *
+ * Papéis que não se misturam:
+ *  --primary  = ACENTO do produto (filete do header, títulos, links, item ativo, chip selecionado).
+ *               Sálvia provisória até o kit de marca definir a cor do Mind (docs/mind, decisão D7).
+ *  --action   = botão primário QUASE-PRETO — nunca a cor do produto.
+ *  --success / --warning / --danger carregam significado; a cor do produto nunca.
  */
 :root {
-  --bg: #faf8f5;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-muted: #f3efe9;
-  --border: #e5ded4;
-  --text: #2b2a27;
-  --text-muted: #6f6a62;
+  --surface-muted: #f7f7f8;
+  --border: #e3e3e6;
+  --text: #0a0a0a;
+  --text-muted: #6a6a6a;
   --primary: #5f7a6a;
   --primary-hover: #4d6558;
   --primary-soft: #e6ede8;
+  --action: #0a0a0a;
+  --action-hover: #2e2e2e;
   --accent: #c98b5b;
   --danger: #b8503f;
   --danger-soft: #f7e6e2;
   --success: #4f7d5b;
   --warning: #b78a2f;
-  --radius: 12px;
+  --radius: 6px;
 }
 
 @theme inline {
@@ -32,6 +39,8 @@
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
+  --color-action: var(--action);
+  --color-action-hover: var(--action-hover);
   --color-accent: var(--accent);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
@@ -64,14 +73,14 @@ body {
   }
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
-      disabled:cursor-not-allowed disabled:opacity-60 bg-primary text-white hover:bg-primary-hover;
+      disabled:cursor-not-allowed disabled:opacity-60 bg-action text-white hover:bg-action-hover;
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
       disabled:cursor-not-allowed disabled:opacity-60 border border-border bg-surface text-text hover:bg-surface-muted;
   }
   .card {
-    @apply rounded-[var(--radius)] border border-border bg-surface p-6;
+    @apply rounded-[var(--radius)] border border-border bg-surface p-6; /* sem sombra (layout.md) */
   }
   .field-error {
     @apply mt-1 text-xs text-danger;

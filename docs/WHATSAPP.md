@@ -65,6 +65,7 @@ Regra inegociável: nenhuma variável carrega conteúdo clínico. Só nome, prof
 `src/lib/whatsapp/replies.ts` interpreta texto livre ou clique em botão:
 
 - **sim / confirmar / 1 / ok / ✅** → confirma a solicitação mais recente `AWAITING_CONFIRMATION` daquele número.
+- Formulários: `hecca_form_request` (preencher formulário; botão para `/formulario/<token>`; {{3}} = título do formulário).
 - Lista de espera: `hecca_waitlist_joined` (entrou na lista) e `hecca_waitlist_offer` (surgiu um horário; botão para `/confirmar/<token>`; {{6}} = horas de reserva). A resposta "sim" a uma oferta confirma como qualquer pedido.
 - **não / cancelar / 2 / ❌** → cancela (`CANCELLED_BY_PATIENT`) se dentro do prazo `minCancelHours`; fora do prazo vira `RESCHEDULE_REQUESTED` para o profissional decidir.
 - Qualquer outra coisa é ignorada (fica registrada em `whatsapp_webhook_events`).

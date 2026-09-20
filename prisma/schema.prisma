@@ -46,6 +46,8 @@ model Organization {
   invitations         Invitation[]
   clinicalDelegations ClinicalDelegation[]
   waitlistEntries     WaitlistEntry[]
+  formTemplates       FormTemplate[]
+  formRequests        FormRequest[]
 
   @@map("organizations")
 }
@@ -81,6 +83,7 @@ model User {
   clinicalNotes       ClinicalNote[]
   clinicalDocuments   ClinicalDocument[]
   clinicalDelegations ClinicalDelegation[]
+  formRequestsSent    FormRequest[]
 
   @@map("users")
 }
@@ -238,6 +241,8 @@ model Professional {
   clinicalDelegationsGranted  ClinicalDelegation[] @relation("DelegationsGranted")
   clinicalDelegationsReceived ClinicalDelegation[] @relation("DelegationsReceived")
   waitlistEntries             WaitlistEntry[]
+  formTemplates               FormTemplate[]
+  formRequests                FormRequest[]
 
   @@index([organizationId])
   @@map("professionals")
@@ -411,6 +416,7 @@ model Patient {
   clinicalDocuments   ClinicalDocument[]
   clinicalDelegations ClinicalDelegation[]
   waitlistEntries     WaitlistEntry[]
+  formRequests        FormRequest[]
   notifications       Notification[]
   receipts            Receipt[]
 
@@ -535,6 +541,7 @@ model Appointment {
   clinicalNotes     ClinicalNote[]
   clinicalDocuments ClinicalDocument[]
   waitlistOffer     WaitlistEntry? // se este agendamento foi oferecido a partir da lista de espera
+  formRequests      FormRequest[]
 
   @@index([professionalId, startsAt])
   @@index([organizationId, startsAt])
@@ -593,6 +600,7 @@ enum NotificationType {
   RESCHEDULE
   WAITLIST_JOINED // entrou na lista de espera
   WAITLIST_OFFER // surgiu um horário; confirmar pelo link
+  FORM_REQUEST // preencher formulário pré-atendimento
 }
 
 enum NotificationStatus {
@@ -692,6 +700,7 @@ model ClinicalAccessLog {
   id                 String   @id @default(cuid())
   clinicalNoteId     String?
   clinicalDocumentId String?
+  formRequestId      String?
   delegationId       String? // acesso feito por delegação (supervisão/substituição)
   userId             String
   action             String // READ | WRITE | DELETE | EXPORT
@@ -701,6 +710,7 @@ model ClinicalAccessLog {
   clinicalNote     ClinicalNote?       @relation(fields: [clinicalNoteId], references: [id], onDelete: Cascade)
   clinicalDocument ClinicalDocument?   @relation(fields: [clinicalDocumentId], references: [id], onDelete: Cascade)
   delegation       ClinicalDelegation? @relation(fields: [delegationId], references: [id], onDelete: SetNull)
+  formRequest      FormRequest?        @relation(fields: [formRequestId], references: [id], onDelete: Cascade)
 
   @@index([clinicalNoteId, createdAt])
   @@index([clinicalDocumentId, createdAt])
@@ -902,4 +912,91 @@ model WaitlistEntry {
   @@index([professionalId, status, createdAt])
   @@index([patientId, status])
   @@map("waitlist_entries")
+}
+
+// ───────────────────────────────────────────────────────────────
+// Formulários pré-atendimento
+// ───────────────────────────────────────────────────────────────
+
+enum FormKind {
+  INTAKE // ficha inicial / anamnese
+  CONSENT // termo de consentimento
+  QUESTIONNAIRE // questionário / check-in
+  CUSTOM
+}
+
+/// CLINICAL: respostas cifradas, acesso pelas regras do prontuário.
+/// ADMINISTRATIVE: respostas em claro (ex.: termo aceito), visíveis a quem gerencia a agenda.
+enum FormDataClass {
+  CLINICAL
+  ADMINISTRATIVE
+}
+
+enum FormRequestStatus {
+  PENDING
+  SUBMITTED
+  EXPIRED
+  CANCELLED
+}
+
+/// Modelo de formulário de um profissional. `fields` segue src/lib/forms-schema.ts.
+model FormTemplate {
+  id             String @id @default(cuid())
+  organizationId String
+  professionalId String
+
+  title                  String
+  description            String?
+  kind                   FormKind      @default(CUSTOM)
+  dataClass              FormDataClass @default(CLINICAL)
+  fields                 Json
+  /// Enviar automaticamente quando a primeira sessão do paciente com este profissional for confirmada.
+  autoSendOnFirstSession Boolean       @default(false)
+  isActive               Boolean       @default(true)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  requests     FormRequest[]
+
+  @@index([professionalId, isActive])
+  @@map("form_templates")
+}
+
+/// Um envio a um paciente. Guarda o snapshot dos campos; o token (hash) é a
+/// credencial do link público /formulario/<token>, de uso único.
+model FormRequest {
+  id              String  @id @default(cuid())
+  organizationId  String
+  professionalId  String
+  patientId       String
+  appointmentId   String?
+  templateId      String?
+  createdByUserId String? // null = envio automático
+
+  titleSnapshot       String
+  descriptionSnapshot String?
+  dataClass           FormDataClass
+  fieldsSnapshot      Json
+  tokenHash           String            @unique
+  status              FormRequestStatus @default(PENDING)
+  sentAt              DateTime          @default(now())
+  expiresAt           DateTime
+  submittedAt         DateTime?
+  submittedIp         String?
+  answersEnc          String? // CLINICAL: AES-GCM (src/lib/crypto.ts)
+  answersJson         Json? // ADMINISTRATIVE: em claro
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient      Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment  Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  template     FormTemplate?       @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy    User?               @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  accessLogs   ClinicalAccessLog[]
+
+  @@index([patientId, status])
+  @@index([status, expiresAt])
+  @@map("form_requests")
 }

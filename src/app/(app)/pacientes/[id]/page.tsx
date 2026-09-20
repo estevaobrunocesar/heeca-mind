@@ -14,6 +14,9 @@ import { FOLLOW_UP_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/validation/patient"
 import { PatientDangerZone } from "./danger-zone";
 import { anonymizationDueAt } from "@/lib/lgpd/retention";
 import { formatDateBR } from "@/lib/time";
+import { canManageSchedule } from "@/lib/permissions";
+import { listRequestsForPatient } from "@/lib/forms";
+import { FormsPanel } from "./formularios/forms-panel";
 
 export const metadata: Metadata = { title: "Paciente" };
 
@@ -83,6 +86,12 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
   const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const showMoney = canViewAnyFinancials(actor);
   const canOpenRecord = !p.anonymizedAt && (await canOpenClinicalRecord(actor, p.id));
+  const formsPro = actor.activeProfessionalId;
+  const canSendForms = !!formsPro && !p.deletedAt && !p.anonymizedAt && canManageSchedule(actor, formsPro);
+  const [formRequests, formTemplates] = await Promise.all([
+    listRequestsForPatient(actor, p.id),
+    canSendForms ? db.formTemplate.findMany({ where: { professionalId: formsPro!, isActive: true }, orderBy: { title: "asc" }, select: { id: true, title: true, dataClass: true } }) : Promise.resolve([]),
+  ]);
   const lastAppointmentAt = p.appointments[0]?.startsAt ?? null; // lista ordenada desc
   const due = anonymizationDueAt({ deletedAt: p.deletedAt, lastAppointmentAt, retentionYears: p.organization.retentionYears });
 
@@ -241,6 +250,14 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
               <p className="text-sm text-text-muted">Acesso restrito ao profissional responsável ou a quem ele delegar (sigilo, CFP art. 9).</p>
             )}
           </section>
+
+          <FormsPanel
+            patientId={p.id}
+            appointmentId={null}
+            canSend={canSendForms}
+            templates={formTemplates}
+            requests={formRequests.map((r) => ({ id: r.id, title: r.title, dataClass: r.dataClass, status: r.status, sentAt: formatDateBR(r.sentAt, tz), submittedAt: r.submittedAt ? formatDateBR(r.submittedAt, tz) : null, canRead: r.canRead }))}
+          />
 
           {canDeletePatient(actor) && (
             <PatientDangerZone id={p.id} deleted={!!p.deletedAt} anonymized={!!p.anonymizedAt} anonymizationDue={due ? formatDateBR(due, tz) : null} />

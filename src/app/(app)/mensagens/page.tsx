@@ -19,6 +19,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   RESCHEDULE: "Reagendamento",
   WAITLIST_JOINED: "Lista de espera",
   WAITLIST_OFFER: "Oferta de horário",
+  FORM_REQUEST: "Formulário",
 };
 
 const STATUS_UI: Record<NotificationStatus, { label: string; cls: string }> = {

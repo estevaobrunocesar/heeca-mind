@@ -222,7 +222,13 @@ export async function recentAccess(actor: Actor, patientId: string, take = 20) {
   const scopes = await requireClinicalAccess(actor, patientId);
   const pros = scopes.map((s) => s.professionalId);
   const rows = await db.clinicalAccessLog.findMany({
-    where: { OR: [{ clinicalNote: { patientId, professionalId: { in: pros } } }, { clinicalDocument: { patientId, professionalId: { in: pros } } }] },
+    where: {
+      OR: [
+        { clinicalNote: { patientId, professionalId: { in: pros } } },
+        { clinicalDocument: { patientId, professionalId: { in: pros } } },
+        { formRequest: { patientId, professionalId: { in: pros } } },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     take,
     select: { action: true, createdAt: true, ip: true, userId: true, delegation: { select: { kind: true } } },

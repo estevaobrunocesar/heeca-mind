@@ -15,6 +15,9 @@ import { canManageSchedule } from "@/lib/permissions";
 import { candidatesForSlot } from "@/lib/waitlist";
 import { describePrefs } from "@/lib/waitlist-match";
 import { WaitlistOfferBlock } from "./waitlist-offer";
+import { listRequestsForPatient } from "@/lib/forms";
+import { FormsPanel } from "../../pacientes/[id]/formularios/forms-panel";
+import { formatDateBR } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Sessão" };
 
@@ -61,6 +64,11 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
   // Vagou? Só para sessões futuras canceladas/expiradas, e só para quem gerencia esta agenda.
   const freed = (a.status.startsWith("CANCELLED") || a.status === "EXPIRED") && a.startsAt > new Date() && canManageSchedule(actor, a.professionalId);
   const candidates = freed ? await candidatesForSlot(a.professionalId, { startsAt: a.startsAt, modality: a.modality }, tz) : [];
+  const canSendForms = canManageSchedule(actor, a.professionalId) && !a.status.startsWith("CANCELLED") && a.status !== "EXPIRED";
+  const [formRequests, formTemplates] = await Promise.all([
+    listRequestsForPatient(actor, a.patient.id),
+    canSendForms ? db.formTemplate.findMany({ where: { professionalId: a.professionalId, isActive: true }, orderBy: { title: "asc" }, select: { id: true, title: true, dataClass: true } }) : Promise.resolve([]),
+  ]);
 
   return (
     <>
@@ -195,6 +203,15 @@ export default async function AppointmentPage({ params }: PageProps<"/agenda/[id
               </Link>
             </div>
           </section>
+
+          <FormsPanel
+            patientId={a.patient.id}
+            appointmentId={a.id}
+            canSend={canSendForms}
+            templates={formTemplates}
+            compact
+            requests={formRequests.map((r) => ({ id: r.id, title: r.title, dataClass: r.dataClass, status: r.status, sentAt: formatDateBR(r.sentAt, tz), submittedAt: r.submittedAt ? formatDateBR(r.submittedAt, tz) : null, canRead: r.canRead }))}
+          />
         </aside>
       </div>
     </>

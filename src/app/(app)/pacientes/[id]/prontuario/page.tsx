@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { activeDelegationsFor, clinicalScopes, DOCUMENT_KIND_LABEL, KIND_LABEL, listDocuments, listNotes, recentAccess, sessionsWithoutEvolution, treatedSessions } from "@/lib/clinical";
 import { DELEGATION_KIND_LABEL, pickWriteScope } from "@/lib/clinical-delegation";
+import { listRequestsForPatient } from "@/lib/forms";
 import { db } from "@/lib/db";
 import { formatBytes } from "@/lib/document";
 import { requireActor } from "@/lib/session";
@@ -50,14 +51,16 @@ export default async function ClinicalRecordPage({ params, searchParams }: PageP
     );
   }
 
-  const [notes, sessions, access, documents, allSessions, shared] = await Promise.all([
+  const [notes, sessions, access, documents, allSessions, shared, formRequests] = await Promise.all([
     listNotes(actor, id),
     sessionsWithoutEvolution(actor, id),
     recentAccess(actor, id),
     listDocuments(actor, id),
     treatedSessions(actor, id),
     activeDelegationsFor(actor, id),
+    listRequestsForPatient(actor, id),
   ]);
+  const clinicalForms = formRequests.filter((r) => r.dataClass === "CLINICAL" && r.status === "SUBMITTED");
   const defaultAppointmentId = typeof sp.sessao === "string" && sessions.some((s) => s.id === sp.sessao) ? sp.sessao : undefined;
   const delegated = scopes.filter((s) => s.delegationId !== null);
   const canWrite = pickWriteScope(scopes) !== null;
@@ -175,6 +178,31 @@ export default async function ClinicalRecordPage({ params, searchParams }: PageP
                       </a>
                       {d.canDelete && <DeleteDocumentForm patientId={id} documentId={d.id} />}
                     </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Formulários · {clinicalForms.length}</h2>
+            {clinicalForms.length === 0 ? (
+              <p className="text-xs text-text-muted">Fichas e questionários respondidos pelo paciente aparecem aqui. Envie pela ficha ou pela sessão.</p>
+            ) : (
+              <ul className="space-y-2">
+                {clinicalForms.map((r) => (
+                  <li key={r.id} className="card flex items-center justify-between gap-2 p-3 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{r.title}</p>
+                      <p className="text-xs text-text-muted">respondido {formatDateTimeBR(r.submittedAt!, tz)}</p>
+                    </div>
+                    {r.canRead ? (
+                      <Link href={`/pacientes/${id}/formularios/${r.id}`} className="shrink-0 text-xs font-medium text-primary hover:underline">
+                        Ver respostas
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-text-muted">sigilo</span>
+                    )}
                   </li>
                 ))}
               </ul>

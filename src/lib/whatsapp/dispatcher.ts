@@ -3,6 +3,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleReminder } from "@/lib/notifications";
 import { syncWaitlistForAppointment, syncWaitlistOffers } from "@/lib/waitlist";
+import { autoSendFirstSessionForms, expireFormRequests } from "@/lib/forms";
 import { getWhatsAppProvider } from "./meta";
 import type { WhatsAppProvider } from "./provider";
 import { parseReply, replyTextFrom } from "./replies";
@@ -257,11 +258,12 @@ export async function runCron() {
   const webhook = await processWebhookEvents();
   const expiry = await expirePendingBookings();
   const waitlistSynced = await syncWaitlistOffers();
+  const forms = { expired: await expireFormRequests(), autoSent: await autoSendFirstSessionForms() };
   const dispatch = await dispatchQueued();
   const purgedRateLimits = await purgeRateLimits();
   const lgpd = await anonymizeExpiredPatients();
   const purgedWebhookEvents = await purgeOldWebhookEvents();
   const purgedMfa = await purgeStaleMfaVerifications();
   const purgedSessions = await purgeSessions();
-  return { webhook, expiry, waitlistSynced, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, purgedMfa, purgedSessions, at: new Date().toISOString() };
+  return { webhook, expiry, waitlistSynced, forms, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, purgedMfa, purgedSessions, at: new Date().toISOString() };
 }

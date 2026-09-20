@@ -81,6 +81,7 @@ export async function deletePatientAction(patientId: string): Promise<{ error?: 
   await db.patient.update({ where: { id: patientId }, data: { deletedAt: new Date(), followUpStatus: "INACTIVE" } });
   await db.recurringSeries.updateMany({ where: { patientId, isActive: true }, data: { isActive: false } });
   await db.waitlistEntry.updateMany({ where: { patientId, status: "WAITING" }, data: { status: "REMOVED", removedReason: "Cadastro excluído", resolvedAt: new Date() } });
+  await db.formRequest.updateMany({ where: { patientId, status: "PENDING" }, data: { status: "CANCELLED" } });
   await audit(actor, { organizationId: actor.organizationId, action: "patient.delete", entityType: "Patient", entityId: patientId });
 
   revalidatePath("/pacientes");

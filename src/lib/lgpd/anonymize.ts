@@ -59,6 +59,7 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
     // Notas e documentos clínicos: fim do prazo de guarda = fim do registro.
     await tx.clinicalNote.deleteMany({ where: { patientId } });
     await tx.clinicalDocument.deleteMany({ where: { patientId } });
+    await tx.formRequest.deleteMany({ where: { patientId } }); // respostas (clínicas ou termos) somem com o titular
     await tx.recurringSeries.updateMany({ where: { patientId }, data: { isActive: false } });
     await tx.waitlistEntry.updateMany({ where: { patientId }, data: { note: null, removedReason: null, status: "REMOVED" } });
     // Auditoria: mantém o rastro (quem, quando, qual ação), remove o conteúdo.

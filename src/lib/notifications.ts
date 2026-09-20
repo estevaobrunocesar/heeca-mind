@@ -116,6 +116,44 @@ export async function scheduleReminder(appointmentId: string, startsAt: Date) {
 }
 
 /**
+ * Pedido de formulário pré-atendimento. O sufixo do botão é o token em
+ * claro (só o hash fica no banco), então ele vem por parâmetro.
+ */
+export async function enqueueFormRequest(requestId: string, token: string) {
+  const r = await db.formRequest.findUniqueOrThrow({
+    where: { id: requestId },
+    select: {
+      organizationId: true,
+      appointmentId: true,
+      titleSnapshot: true,
+      patient: { select: { id: true, name: true, whatsapp: true } },
+      professional: { select: { displayName: true } },
+    },
+  });
+  const type = "FORM_REQUEST" as const;
+  const spec = TEMPLATES[type];
+  return db.notification.create({
+    data: {
+      organizationId: r.organizationId,
+      appointmentId: r.appointmentId,
+      patientId: r.patient.id,
+      channel: "WHATSAPP",
+      type,
+      recipient: r.patient.whatsapp,
+      templateName: spec.name,
+      payload: {
+        bodyVariables: buildVariables(type, {
+          patientFirstName: r.patient.name.split(" ")[0] ?? r.patient.name,
+          professionalName: r.professional.displayName,
+          formTitle: r.titleSnapshot,
+        }),
+        buttonUrlSuffixes: [{ index: spec.urlButton!.index, suffix: token }],
+      },
+    },
+  });
+}
+
+/**
  * Confirmação de entrada na lista de espera. Sem agendamento: a notificação
  * fica ligada só ao paciente.
  */

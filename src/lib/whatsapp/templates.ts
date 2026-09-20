@@ -84,6 +84,14 @@ export const TEMPLATES: Record<NotificationType, TemplateSpec> = {
     variables: ["patientFirstName", "professionalName", "modality", "date", "time", "holdHours"],
     urlButton: { index: 0, baseUrl: "/confirmar/" },
   },
+  FORM_REQUEST: {
+    name: "hecca_form_request",
+    reference:
+      "Olá, {{1}}! {{2}} pede que você preencha o formulário \"{{3}}\" antes da sua sessão.\n" +
+      "Leva poucos minutos e suas respostas são confidenciais. Clique abaixo para responder.",
+    variables: ["patientFirstName", "professionalName", "formTitle"],
+    urlButton: { index: 0, baseUrl: "/formulario/" },
+  },
   RESCHEDULE: {
     name: "hecca_reschedule",
     reference:

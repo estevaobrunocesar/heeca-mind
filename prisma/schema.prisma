@@ -59,19 +59,21 @@ enum MembershipRole {
 }
 
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  passwordHash      String
-  name              String
-  emailVerifiedAt   DateTime?
-  mfaEnabled        Boolean   @default(false)
-  mfaSecretEnc      String? // TOTP secret cifrado (AES-GCM); presente antes de mfaEnabled durante a ativação
-  mfaEnabledAt      DateTime?
-  mfaRecoveryHashes String[]  @default([]) // sha256 dos códigos de recuperação ainda não usados
-  isActive          Boolean   @default(true)
-  lastLoginAt       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String
+  name               String
+  emailVerifiedAt    DateTime?
+  mfaEnabled         Boolean   @default(false)
+  mfaSecretEnc       String? // TOTP secret cifrado (AES-GCM); presente antes de mfaEnabled durante a ativação
+  mfaEnabledAt       DateTime?
+  mfaRecoveryHashes  String[]  @default([]) // sha256 dos códigos de recuperação ainda não usados
+  /// Avisos por e-mail ao profissional (src/lib/pro-notify-prefs.ts). null = tudo ligado.
+  emailNotifications Json?
+  isActive           Boolean   @default(true)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   memberships         Membership[]
   professional        Professional?
@@ -601,6 +603,15 @@ enum NotificationType {
   WAITLIST_JOINED // entrou na lista de espera
   WAITLIST_OFFER // surgiu um horário; confirmar pelo link
   FORM_REQUEST // preencher formulário pré-atendimento
+  // Avisos ao PROFISSIONAL (canal EMAIL; payload = { subject, text, html })
+  PRO_BOOKING_REQUESTED
+  PRO_BOOKING_CONFIRMED
+  PRO_BOOKING_CANCELLED
+  PRO_RESCHEDULE_REQUESTED
+  PRO_FORM_SUBMITTED
+  PRO_WAITLIST_JOINED
+  PRO_WAITLIST_OFFER_ANSWERED
+  PRO_DELEGATION_RECEIVED
 }
 
 enum NotificationStatus {

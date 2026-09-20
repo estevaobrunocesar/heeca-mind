@@ -4,7 +4,10 @@ import { db } from "@/lib/db";
 import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleReminder } from "@/lib/notifications";
 import { syncWaitlistForAppointment, syncWaitlistOffers } from "@/lib/waitlist";
 import { autoSendFirstSessionForms, expireFormRequests } from "@/lib/forms";
+import { notifyProfessional } from "@/lib/pro-notify";
 import { getWhatsAppProvider } from "./meta";
+import { getEmailProvider } from "@/lib/email";
+import type { EmailProvider } from "@/lib/email";
 import type { WhatsAppProvider } from "./provider";
 import { parseReply, replyTextFrom } from "./replies";
 import { purgeRateLimits } from "@/lib/rate-limit";
@@ -30,13 +33,14 @@ function nextRetry(attempts: number): Date {
 }
 
 type Payload = { bodyVariables: string[]; buttonUrlSuffixes?: Array<{ index: number; suffix: string }> };
+type EmailPayload = { subject: string; text: string; html?: string };
 
 const NOT_ACTIVE_TYPES = new Set(["REMINDER_24H", "REMINDER_2H", "SESSION_LINK"]);
 
 /** Envia as notificações vencidas. Retorna contagem por resultado. */
-export async function dispatchQueued(provider: WhatsAppProvider = getWhatsAppProvider()) {
+export async function dispatchQueued(provider: WhatsAppProvider = getWhatsAppProvider(), email: EmailProvider = getEmailProvider()) {
   const due = await db.notification.findMany({
-    where: { status: "QUEUED", scheduledFor: { lte: new Date() }, channel: "WHATSAPP" },
+    where: { status: "QUEUED", scheduledFor: { lte: new Date() } },
     orderBy: { scheduledFor: "asc" },
     take: BATCH,
     select: { id: true },
@@ -67,13 +71,19 @@ export async function dispatchQueued(provider: WhatsAppProvider = getWhatsAppPro
       continue;
     }
 
-    const payload = n.payload as Payload;
-    const res = await provider.sendTemplate({
-      to: n.recipient,
-      templateName: n.templateName ?? "",
-      bodyVariables: payload.bodyVariables,
-      buttonUrlSuffixes: payload.buttonUrlSuffixes,
-    });
+    let res: { ok: true; providerMessageId?: string } | { ok: false; error: string; retryable: boolean };
+    if (n.channel === "EMAIL") {
+      const p = n.payload as EmailPayload;
+      res = await email.send({ to: n.recipient, subject: p.subject, text: p.text, html: p.html });
+    } else {
+      const payload = n.payload as Payload;
+      res = await provider.sendTemplate({
+        to: n.recipient,
+        templateName: n.templateName ?? "",
+        bodyVariables: payload.bodyVariables,
+        buttonUrlSuffixes: payload.buttonUrlSuffixes,
+      });
+    }
 
     if (res.ok) {
       await db.notification.update({
@@ -221,7 +231,7 @@ async function applyReply(m: MessageEvent): Promise<boolean> {
       status: isYes ? "AWAITING_CONFIRMATION" : { in: ["AWAITING_CONFIRMATION", "CONFIRMED"] },
     },
     orderBy: { createdAt: "desc" },
-    select: { id: true, organizationId: true, startsAt: true, professional: { select: { scheduleSettings: { select: { minCancelHours: true } } } } },
+    select: { id: true, organizationId: true, startsAt: true, source: true, professional: { select: { scheduleSettings: { select: { minCancelHours: true } } } } },
   });
   if (!target) return false;
 
@@ -231,6 +241,7 @@ async function applyReply(m: MessageEvent): Promise<boolean> {
     await enqueueAppointmentNotification(target.id, "BOOKING_CONFIRMED");
     await scheduleReminder(target.id, target.startsAt);
     await syncWaitlistForAppointment(target.id);
+    if (target.source !== "WAITLIST") await notifyProfessional({ event: "BOOKING_CONFIRMED", appointmentId: target.id, by: "whatsapp" });
     return true;
   }
 
@@ -239,6 +250,7 @@ async function applyReply(m: MessageEvent): Promise<boolean> {
     // Fora do prazo: registra o pedido para o profissional decidir, sem cancelar.
     await db.appointment.update({ where: { id: target.id }, data: { status: "RESCHEDULE_REQUESTED" } });
     await audit(null, { organizationId: target.organizationId, action: "appointment.reschedule_requested", entityType: "Appointment", entityId: target.id, after: { by: "whatsapp_reply", text } });
+    await notifyProfessional({ event: "RESCHEDULE_REQUESTED", appointmentId: target.id });
     return true;
   }
 
@@ -250,6 +262,7 @@ async function applyReply(m: MessageEvent): Promise<boolean> {
   await cancelQueuedNotifications(target.id);
   await enqueueAppointmentNotification(target.id, "CANCELLATION");
   await syncWaitlistForAppointment(target.id);
+  if (target.source !== "WAITLIST") await notifyProfessional({ event: "BOOKING_CANCELLED", appointmentId: target.id, by: "whatsapp" });
   return true;
 }
 

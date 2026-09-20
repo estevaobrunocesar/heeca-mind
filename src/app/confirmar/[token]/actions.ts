@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { cancelQueuedNotifications, enqueueAppointmentNotification, scheduleReminder } from "@/lib/notifications";
 import { syncWaitlistForAppointment } from "@/lib/waitlist";
+import { notifyProfessional } from "@/lib/pro-notify";
 import { clientIp, rateLimit, retryMessage, RULES } from "@/lib/rate-limit";
 
 /**
@@ -27,6 +28,7 @@ async function byToken(token: string) {
       id: true,
       organizationId: true,
       status: true,
+      source: true,
       startsAt: true,
       professional: { select: { scheduleSettings: { select: { minCancelHours: true } } } },
     },
@@ -49,6 +51,7 @@ export async function confirmByTokenAction(token: string): Promise<{ ok: boolean
   await enqueueAppointmentNotification(a.id, "BOOKING_CONFIRMED");
   await scheduleReminder(a.id, a.startsAt);
   await syncWaitlistForAppointment(a.id);
+  if (a.source !== "WAITLIST") await notifyProfessional({ event: "BOOKING_CONFIRMED", appointmentId: a.id, by: "link" });
   revalidatePath(`/confirmar/${token}`);
   return { ok: true, message: "Horário confirmado. Até lá!" };
 }
@@ -80,6 +83,7 @@ export async function cancelByTokenAction(token: string): Promise<{ ok: boolean;
   await cancelQueuedNotifications(a.id);
   await enqueueAppointmentNotification(a.id, "CANCELLATION");
   await syncWaitlistForAppointment(a.id);
+  if (a.source !== "WAITLIST") await notifyProfessional({ event: "BOOKING_CANCELLED", appointmentId: a.id, by: "link" });
   revalidatePath(`/confirmar/${token}`);
   return { ok: true, message: "Agendamento cancelado." };
 }

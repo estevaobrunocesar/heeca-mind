@@ -8,6 +8,7 @@ import { clientIp, rateLimitAll, retryMessage, RULES } from "@/lib/rate-limit";
 import { publicWaitlistSchema } from "@/lib/validation/waitlist";
 import { enqueueWaitlistJoined, joinWaitlist } from "@/lib/waitlist";
 import { parsePrefs } from "@/lib/waitlist-match";
+import { notifyProfessional } from "@/lib/pro-notify";
 
 /**
  * Entrada pública na lista de espera. Mesmas proteções do agendamento
@@ -55,7 +56,10 @@ export async function joinWaitlistAction(prev: FormState & { slug: string }, for
     source: "PUBLIC_PAGE",
   });
   await audit(null, { organizationId: professional.organizationId, action: r.created ? "waitlist.join" : "waitlist.update", entityType: "WaitlistEntry", entityId: r.id, after: { source: "PUBLIC_PAGE" } });
-  if (r.created) await enqueueWaitlistJoined(r.id);
+  if (r.created) {
+    await enqueueWaitlistJoined(r.id);
+    await notifyProfessional({ event: "WAITLIST_JOINED", waitlistEntryId: r.id });
+  }
 
   redirect(`/agendar/${slug}/espera/ok`);
 }

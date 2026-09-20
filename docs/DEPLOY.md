@@ -25,6 +25,10 @@ openssl rand -hex 24      # CRON_SECRET
 | `DATABASE_URL` | sim | Em serverless use a URL **pooled** (`?pgbouncer=true` no Supabase; `-pooler` no Neon). |
 | `AUTH_SECRET` | sim | Assina o JWT. Trocar derruba todas as sessões. |
 | `ENCRYPTION_KEY` | sim | Cifra notas clínicas, documentos, respostas de formulários e segredos MFA. **Perder = perder os dados cifrados.** Guarde em cofre. Nunca reutilize entre ambientes. |
+| `EMAIL_DRIVER` | | `console` (log), `smtp` ou `resend`. Sem provedor, reset de senha, convites e avisos ao profissional só vão para o log. |
+| `EMAIL_FROM` | com e-mail | Remetente, ex.: `Hecca Psico <no-reply@seudominio.com.br>` (domínio com SPF/DKIM no provedor). |
+| `SMTP_URL` | smtp | `smtps://usuario:senha@host:465` ou `smtp://usuario:senha@host:587` (STARTTLS). Teste: `SMTP_CHECK_TO=voce@x.com npx tsx --conditions=react-server scripts/smtp-check.ts`. |
+| `RESEND_API_KEY` | resend | Chave da API do Resend. |
 | `ENCRYPTION_KEY_PREVIOUS` | | Só durante uma rotação: chave(s) antiga(s), separadas por vírgula, para decifrar. Ver seção 7. |
 | `NEXT_PUBLIC_APP_URL` | sim | `https://…` — vai nos links de WhatsApp e no QR do MFA. |
 | `CRON_SECRET` | sim (prod) | `Authorization: Bearer` do `/api/cron`. |

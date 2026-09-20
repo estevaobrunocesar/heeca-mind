@@ -162,6 +162,15 @@ prisma/                schema, migrations, seed
 - Vercel: `vercel.json` (região gru1 + cron); use URL de banco com pooler; `STORAGE_DRIVER=s3`.
 - Seed bloqueado em produção (`ALLOW_SEED=1` força).
 
+## E-mail e avisos ao profissional
+
+- `src/lib/email/`: `EmailProvider` com drivers `console` (default), `smtp` (cliente próprio em `smtp.ts` + partes puras testadas em `smtp-core.ts`; sem nodemailer — conflita com o peer do next-auth) e `resend` (HTTP). `EMAIL_DRIVER`, `EMAIL_FROM`, `SMTP_URL` (smtp:// = STARTTLS, smtps:// = TLS; `?starttls=0` só para Mailpit local), `RESEND_API_KEY`. `npx tsx --conditions=react-server scripts/smtp-check.ts` testa contra um servidor falso e, com `SMTP_CHECK_TO`, contra o real.
+- `sendEmail` é síncrono (reset de senha, convite). Avisos ao profissional vão pela **fila**: `notifyProfessional(event)` (`src/lib/pro-notify.ts`) cria `Notification` com `channel: EMAIL` e tipo `PRO_*`; o dispatcher envia com o mesmo claim/retry do WhatsApp e o painel `/mensagens` mostra os dois canais.
+- **Nunca conteúdo clínico nem respostas de formulário no e-mail** — só nome, título, data e link. A caixa de e-mail está fora do nosso controle.
+- Preferências por usuário em `User.emailNotifications` (`src/lib/pro-notify-prefs.ts`, puro; null = tudo ligado; evento novo nasce ligado). UI em `/configuracoes/notificacoes`. Profissional sem login não recebe.
+- Eventos: pedido público, confirmou/cancelou (link ou WhatsApp), reagendamento pedido, formulário respondido, entrou na lista de espera, aceitou/recusou oferta, delegação recebida. Oferta da lista de espera avisa só pelo evento de oferta (não duplica com confirmou/cancelou). `notifyProfessional` nunca lança.
+- `TEMPLATES` do WhatsApp é `Record<WhatsAppNotificationType, …>` (= `NotificationType` sem `PRO_*`).
+
 ## Cifra e rotação de chave
 
 - `src/lib/crypto-core.ts` é puro e testado; `src/lib/crypto.ts` só liga ao ambiente (`ENCRYPTION_KEY` + `ENCRYPTION_KEY_PREVIOUS`). Todo dado novo leva o `keyId` (8 hex de sha256 da chave) no envelope: texto `k1:<keyId>:<base64>`, blob `\0HPENC\x01<len><keyId>…`. Dado sem envelope é legado: decifra por tentativa em cada chave do chaveiro (o tag do GCM rejeita a errada).

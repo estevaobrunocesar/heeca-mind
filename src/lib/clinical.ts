@@ -8,6 +8,7 @@ import { DOCUMENT_EXT, DOCUMENT_MIME, MAX_DOCUMENT_BYTES, safeFileName, sniffDoc
 import { canAccessClinicalData, type Actor } from "./permissions";
 import { clientIp } from "./rate-limit";
 import { getStorage } from "./storage";
+import { notifyProfessional } from "./pro-notify";
 
 /**
  * Prontuário: único ponto de acesso às notas e documentos clínicos.
@@ -546,6 +547,7 @@ export async function grantDelegation(
     },
     select: { id: true },
   });
+  await notifyProfessional({ event: "DELEGATION_RECEIVED", delegationId: d.id });
   return d.id;
 }
 

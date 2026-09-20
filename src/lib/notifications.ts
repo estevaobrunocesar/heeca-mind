@@ -2,7 +2,7 @@ import "server-only";
 import type { NotificationType } from "@/generated/prisma/enums";
 import { db } from "./db";
 import { formatDateBR, slotLabelInTz } from "./time";
-import { buildVariables, TEMPLATES } from "./whatsapp/templates";
+import { buildVariables, TEMPLATES, type WhatsAppNotificationType } from "./whatsapp/templates";
 
 /**
  * Enfileira notificações de WhatsApp para um agendamento.
@@ -16,7 +16,7 @@ import { buildVariables, TEMPLATES } from "./whatsapp/templates";
  */
 export async function enqueueAppointmentNotification(
   appointmentId: string,
-  type: NotificationType,
+  type: WhatsAppNotificationType,
   opts: { scheduledFor?: Date } = {},
 ) {
   const a = await db.appointment.findUniqueOrThrow({
@@ -102,7 +102,7 @@ export async function cancelQueuedNotifications(appointmentId: string) {
  */
 export async function scheduleReminder(appointmentId: string, startsAt: Date) {
   const a = await db.appointment.findUniqueOrThrow({ where: { id: appointmentId }, select: { modality: true } });
-  const plan: Array<{ type: NotificationType; at: Date }> = [
+  const plan: Array<{ type: WhatsAppNotificationType; at: Date }> = [
     { type: "REMINDER_24H", at: new Date(startsAt.getTime() - 24 * 60 * 60 * 1000) },
   ];
   if (a.modality === "ONLINE") plan.push({ type: "SESSION_LINK", at: new Date(startsAt.getTime() - 2 * 60 * 60 * 1000) });

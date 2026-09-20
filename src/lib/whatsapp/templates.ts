@@ -13,6 +13,9 @@
 
 import type { NotificationType } from "@/generated/prisma/enums";
 
+/** Tipos que vão por WhatsApp (ao paciente). PRO_* são e-mails ao profissional. */
+export type WhatsAppNotificationType = Exclude<NotificationType, `PRO_${string}`>;
+
 export type TemplateSpec = {
   name: string;
   /** Texto de referência (pt_BR) cadastrado na Meta. */
@@ -23,7 +26,7 @@ export type TemplateSpec = {
   urlButton?: { index: number; baseUrl: string };
 };
 
-export const TEMPLATES: Record<NotificationType, TemplateSpec> = {
+export const TEMPLATES: Record<WhatsAppNotificationType, TemplateSpec> = {
   BOOKING_REQUEST: {
     name: "hecca_booking_request",
     reference:
@@ -103,7 +106,7 @@ export const TEMPLATES: Record<NotificationType, TemplateSpec> = {
 
 /** Constrói o array de variáveis na ordem esperada pelo template. */
 export function buildVariables(
-  type: NotificationType,
+  type: WhatsAppNotificationType,
   values: Record<string, string>,
 ): string[] {
   const spec = TEMPLATES[type];

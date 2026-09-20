@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      // @auth/core pode ficar aninhado em next-auth/node_modules (peer de nodemailer);
+      // o augment de src/types/next-auth.d.ts precisa resolver para a MESMA cópia que o next-auth usa.
+      "@auth/core/*": ["./node_modules/next-auth/node_modules/@auth/core/*", "./node_modules/@auth/core/*"]
     }
   },
   "include": [

@@ -9,6 +9,7 @@ import { cancelQueuedNotifications, enqueueAppointmentNotification, enqueueWaitl
 import type { Actor } from "./permissions";
 import { partsInTz } from "./time";
 import { matchesSlot, sortWaitlist, type WaitlistPrefs } from "./waitlist-match";
+import { notifyProfessional } from "./pro-notify";
 
 /**
  * Lista de espera.
@@ -188,9 +189,11 @@ export async function syncWaitlistForAppointment(appointmentId: string): Promise
   if (s === "CONFIRMED" || s === "COMPLETED" || s === "AWAITING_PAYMENT" || s === "NO_SHOW") {
     await db.waitlistEntry.update({ where: { id: entry.id }, data: { status: "BOOKED", resolvedAt: new Date() } });
     await audit(null, { organizationId: entry.organizationId, action: "waitlist.booked", entityType: "WaitlistEntry", entityId: entry.id, after: { appointmentId } });
+    await notifyProfessional({ event: "WAITLIST_OFFER_ANSWERED", waitlistEntryId: entry.id, appointmentId, accepted: true });
   } else if (s === "CANCELLED_BY_PATIENT" || s === "CANCELLED_BY_PROFESSIONAL" || s === "EXPIRED") {
     await db.waitlistEntry.update({ where: { id: entry.id }, data: { status: "WAITING", offeredAppointmentId: null, offeredAt: null } });
     await audit(null, { organizationId: entry.organizationId, action: "waitlist.offer_declined", entityType: "WaitlistEntry", entityId: entry.id, after: { appointmentId, appointmentStatus: s } });
+    if (s !== "CANCELLED_BY_PROFESSIONAL") await notifyProfessional({ event: "WAITLIST_OFFER_ANSWERED", waitlistEntryId: entry.id, appointmentId, accepted: false });
   }
 }
 

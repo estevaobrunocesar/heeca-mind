@@ -9,6 +9,7 @@ import { fieldsSchema, type Answers, type FormField } from "./forms-schema";
 import { enqueueFormRequest } from "./notifications";
 import { canManageSchedule, type Actor } from "./permissions";
 import { clientIp } from "./rate-limit";
+import { notifyProfessional } from "./pro-notify";
 
 /**
  * Formulários pré-atendimento.
@@ -176,6 +177,7 @@ export async function submitAnswers(token: string, answers: Answers): Promise<vo
   });
   if (res.count === 0) throw new FormError("Este link não está mais válido.");
   await audit(null, { organizationId: r.organizationId, action: "form_request.submit", entityType: "FormRequest", entityId: r.id });
+  await notifyProfessional({ event: "FORM_SUBMITTED", formRequestId: r.id });
 }
 
 /** Cron: pedidos pendentes vencidos viram EXPIRED. */

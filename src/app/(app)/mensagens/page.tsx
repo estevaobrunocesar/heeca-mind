@@ -20,6 +20,14 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   WAITLIST_JOINED: "Lista de espera",
   WAITLIST_OFFER: "Oferta de horário",
   FORM_REQUEST: "Formulário",
+  PRO_BOOKING_REQUESTED: "Aviso: novo pedido",
+  PRO_BOOKING_CONFIRMED: "Aviso: confirmou",
+  PRO_BOOKING_CANCELLED: "Aviso: cancelou",
+  PRO_RESCHEDULE_REQUESTED: "Aviso: reagendamento",
+  PRO_FORM_SUBMITTED: "Aviso: formulário respondido",
+  PRO_WAITLIST_JOINED: "Aviso: lista de espera",
+  PRO_WAITLIST_OFFER_ANSWERED: "Aviso: resposta a oferta",
+  PRO_DELEGATION_RECEIVED: "Aviso: delegação",
 };
 
 const STATUS_UI: Record<NotificationStatus, { label: string; cls: string }> = {
@@ -31,8 +39,12 @@ const STATUS_UI: Record<NotificationStatus, { label: string; cls: string }> = {
   FAILED: { label: "Falhou", cls: "bg-danger-soft text-danger" },
 };
 
-function mask(phone: string) {
-  return phone.replace(/^(\+\d{2})(\d{2})\d+(\d{4})$/, "$1 $2 •••••-$3");
+function mask(recipient: string) {
+  if (recipient.includes("@")) {
+    const [u, d] = recipient.split("@");
+    return `${u.slice(0, 2)}•••@${d}`;
+  }
+  return recipient.replace(/^(\+\d{2})(\d{2})\d+(\d{4})$/, "$1 $2 •••••-$3");
 }
 
 export default async function MessagesPage({ searchParams }: PageProps<"/mensagens">) {

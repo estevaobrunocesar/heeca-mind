@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { formValues, invalid, type FormState } from "@/lib/form";
 import { enqueueAppointmentNotification } from "@/lib/notifications";
+import { notifyProfessional } from "@/lib/pro-notify";
 import { clientIp, MAX_PENDING_BOOKINGS_PER_PHONE, rateLimitAll, retryMessage, RULES } from "@/lib/rate-limit";
 import { dateTimeInTz } from "@/lib/time";
 import { publicBookingSchema } from "@/lib/validation/booking";
@@ -150,6 +151,7 @@ export async function createPublicBookingAction(
     after: { source: "PUBLIC_PAGE", startsAt },
   });
   await enqueueAppointmentNotification(result.appointment.id, "BOOKING_REQUEST");
+  await notifyProfessional({ event: "BOOKING_REQUESTED", appointmentId: result.appointment.id });
 
   redirect(`/agendar/${slug}/solicitado?id=${result.appointment.id}`);
 }

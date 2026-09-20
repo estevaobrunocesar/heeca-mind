@@ -94,6 +94,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/relatori
   const bookedMinutes = held.reduce((s, a) => s + a.durationMinutes, 0);
   const capacity = pros.reduce((s, p) => s + workingMinutes(p.availability, fromISO, toISO), 0);
   const received = payments.reduce((s, p) => s + p.amountCents, 0);
+  const receivedSessions = payments.filter((p) => p.appointment).reduce((s, p) => s + p.amountCents, 0);
   const billableCompleted = completed.filter((a) => a.paymentStatus !== "WAIVED" && a.paymentStatus !== "PACKAGE").length;
   const cohorts = clientCohorts(patients.map((p) => ({ createdAt: p.createdAt, followUpStatus: p.followUpStatus, lastCompletedAt: p.lastCompletedAt, deletedAt: p.deletedAt, completedCount: p._count.appointments, hasActiveSeries: p._count.recurringSeries > 0 })), { from, to }, now, pros[0]?.policy?.reactivationAfterDays ?? 90);
   const byPro = groupSum(payments, (p) => p.appointment?.professional.displayName ?? p.packagePurchase?.professional.displayName ?? "—", (p) => p.amountCents);
@@ -148,7 +149,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/relatori
           <h2 className="mb-2 text-base font-semibold">Faturamento</h2>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Kpi label="Recebido no mês" value={formatBRL(received)} hint={`${payments.length} pagamento(s), sessões e pacotes`} />
-            <Kpi label="Ticket médio" value={avgCents(received, billableCompleted) === null ? "—" : formatBRL(avgCents(received, billableCompleted)!)} hint="recebido ÷ sessões concluídas cobradas" />
+            <Kpi label="Ticket médio" value={avgCents(receivedSessions, billableCompleted) === null ? "—" : formatBRL(avgCents(receivedSessions, billableCompleted)!)} hint="recebido de sessões ÷ sessões concluídas cobradas (pacotes fora)" />
             <Kpi label="No-show" value={pct(noShow.length, completed.length + noShow.length) === null ? "—" : `${pct(noShow.length, completed.length + noShow.length)}%`} hint={`${noShow.length} falta(s)`} />
             <Kpi label="Cancelamentos" value={pct(cancelled.length, appts.length) === null ? "—" : `${pct(cancelled.length, appts.length)}%`} hint={`${cancelled.length} de ${appts.length} agendadas`} />
           </div>

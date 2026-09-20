@@ -139,8 +139,6 @@ Todas implementadas conforme a coluna "Recomendação", exceto D7 (cor do produt
 ## 7. Dívidas conhecidas (não bloqueiam o §41)
 
 - E2E Playwright (as 5 jornadas do `07-TESTES.md`) — hoje a verificação é manual no navegador + `check:*`.
-- Recepção pode revogar sessões do portal pelo serviço, mas não há botão na ficha.
-- Ticket médio inclui receita de pacotes no numerador (rótulo diz "recebido ÷ concluídas cobradas").
 - Logo da clínica: coluna existe, upload não.
 - Cor de acento do Mind (D7).
 

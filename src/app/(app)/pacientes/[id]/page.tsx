@@ -13,6 +13,7 @@ import { formatDateTimeBR } from "@/lib/time";
 import { FOLLOW_UP_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/validation/patient";
 import { describeCommsPrefs, parseCommsPrefs } from "@/lib/comms-prefs";
 import { PatientDangerZone } from "./danger-zone";
+import { PortalAccess } from "./portal-access";
 import { anonymizationDueAt } from "@/lib/lgpd/retention";
 import { formatDateBR } from "@/lib/time";
 import { canManageSchedule } from "@/lib/permissions";
@@ -108,6 +109,7 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
     listRequestsForPatient(actor, p.id),
     canSendForms ? db.formTemplate.findMany({ where: { professionalId: formsPro!, isActive: true }, orderBy: { title: "asc" }, select: { id: true, title: true, dataClass: true } }) : Promise.resolve([]),
   ]);
+  const portalSessions = await db.patientSession.findMany({ where: { patientId: p.id, revokedAt: null, expiresAt: { gt: now } }, orderBy: { lastSeenAt: "desc" }, select: { lastSeenAt: true } });
   const lastAppointmentAt = p.appointments[0]?.startsAt ?? null; // lista ordenada desc
   const due = anonymizationDueAt({ deletedAt: p.deletedAt, lastAppointmentAt, retentionYears: p.organization.retentionYears });
 
@@ -307,6 +309,9 @@ export default async function PatientPage({ params }: PageProps<"/pacientes/[id]
             requests={formRequests.map((r) => ({ id: r.id, title: r.title, dataClass: r.dataClass, status: r.status, sentAt: formatDateBR(r.sentAt, tz), submittedAt: r.submittedAt ? formatDateBR(r.submittedAt, tz) : null, canRead: r.canRead }))}
           />
 
+          {!p.anonymizedAt && !p.deletedAt && canManageSchedule(actor, actor.activeProfessionalId ?? "") && (
+            <PortalAccess patientId={p.id} activeSessions={portalSessions.length} lastSeen={portalSessions[0] ? formatDateTimeBR(portalSessions[0].lastSeenAt, tz) : null} />
+          )}
           {canDeletePatient(actor) && (
             <PatientDangerZone id={p.id} deleted={!!p.deletedAt} anonymized={!!p.anonymizedAt} anonymizationDue={due ? formatDateBR(due, tz) : null} />
           )}

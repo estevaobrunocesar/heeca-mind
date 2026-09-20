@@ -20,6 +20,8 @@ npm run dev                   # após mudar o schema: prisma generate + reinicia
 # Se acontecer: parar o dev, `rm -rf .next`, subir de novo.
 npm run cron                  # roda dispatcher/expiração/webhook uma vez (dev)
 npm run heeca:sim -- provision ana@exemplo.com          # simula o portal (provision/entitlement/sso) e o Notify (callbacks)
+npm run check:tenant          # isolamento por tenant dos módulos do Mind (banco local)
+npm run check:lgpd            # anonimização (banco local)
 npm test
 npm run build                 # build de produção (NODE_ENV=production)
 npm run docker:build          # imagem Docker

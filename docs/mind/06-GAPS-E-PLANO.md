@@ -36,6 +36,24 @@
 
 ## 2. Plano por etapas (ordem de dependência, não de valor)
 
+**Estado em 20/09/2026 — todas as etapas executadas na branch `mind` (commits 65f1a63 … 5419f01 e o de release):**
+
+| Etapa | Estado | Commit |
+|---|---|---|
+| 0 Rebranding, segmento, registro genérico, casca clean | ✅ | 65f1a63, b1f21d0 |
+| 1 Integração com o Core (portal + Notify) | ✅ | 2090b7d |
+| 2 FINANCE, IN_PROGRESS, ficha §12, tags, clínica §6 | ✅ | fce3897, 95f3df1 |
+| 3 Pacotes | ✅ | f77792f |
+| 4 Documentos e consentimentos | ✅ | a438fd6 |
+| 5 Portal do paciente | ✅ | 1d86511 |
+| 6 Comissões | ✅ | fc3d432 |
+| 7 Dashboard, relatórios, reativação, pesquisa | ✅ | 5419f01 |
+| 8 Endurecimento | ✅ | `check:tenant`, `check:lgpd`, dump-grep, build; E2E Playwright fica como dívida (§7 abaixo) |
+
+O que **depende da plataforma** para o Mind ir ao ar está em `docs/DEPLOY.md` §5 e na seção 8 deste documento.
+
+
+
 Estimativas em dias de trabalho de um agente com revisão do Bruno; cada etapa termina com testes verdes, `CLAUDE.md` atualizado e commit.
 
 ### Etapa 0 — Rebranding e casca (2 d)
@@ -94,7 +112,7 @@ Cards do §26, `/relatorios` (§27) com regras puras, reativação por clique, `
 
 Assinatura recorrente do paciente (§21), gateway de pagamento do paciente, multiunidade com telas (§31), videoconferência integrada, IA, BI, app, assinatura qualificada, subdomínio por tenant, N:N serviço×profissional (D1-b), campanhas.
 
-## 5. ⚑ Decisões pendentes (Bruno)
+## 5. ⚑ Decisões (fechadas em 20/09/2026 — Bruno aprovou as recomendações)
 
 | # | Decisão | Opções | Recomendação | Trava |
 |---|---|---|---|---|
@@ -107,3 +125,29 @@ Assinatura recorrente do paciente (§21), gateway de pagamento do paciente, mult
 | D7 | Nome/cor do produto e `data-accent="mind"` | kit de marca | — | Etapa 0 (plataforma) |
 | D8 | Domínio público | `mind.heeca.com.br/agendar/<slug>` · wildcard por tenant | caminho por slug | Etapa 1 |
 | D9 | Registrar no `ecosystem.ts`/`PENDENCIAS.md` que Health tem dois motores (Dental, Mind) e Nutri/Fono nascem do Mind | sim · não | sim | plataforma |
+
+Todas implementadas conforme a coluna "Recomendação", exceto D7 (cor do produto), que continua provisória (`--primary` sálvia em `globals.css`) até o kit de marca.
+
+## 6. Ajustes de rota feitos durante a execução (não previstos no plano)
+
+- `heeca_lembrete` unificado tem botões quick_reply → sessões criadas manualmente ganham `confirmationToken` sob demanda ao enfileirar (bug real pego no E2E da etapa 5).
+- Portal do paciente é por slug do profissional (`/portal/<slug>`): é o que dá o tenant; a sessão vale para a organização inteira.
+- "PDF" de documentos = página de impressão com hash (padrão do prontuário e do Dental); sem dependência de geração de PDF.
+- Pacotes e documentos pertencem ao profissional (coerente com D1); `FormTemplate` administrativos antigos continuam válidos como questionários.
+- Comissão sobre pacote: percentual sobre o valor pago; valor fixo proporcional às sessões pagas.
+
+## 7. Dívidas conhecidas (não bloqueiam o §41)
+
+- E2E Playwright (as 5 jornadas do `07-TESTES.md`) — hoje a verificação é manual no navegador + `check:*`.
+- Recepção pode revogar sessões do portal pelo serviço, mas não há botão na ficha.
+- Ticket médio inclui receita de pacotes no numerador (rótulo diz "recebido ÷ concluídas cobradas").
+- Logo da clínica: coluna existe, upload não.
+- Cor de acento do Mind (D7).
+
+## 8. Tarefas da plataforma para a prateleira (chat da plataforma)
+
+1. Catálogo `mind` (planos/preços, `PRODUCT_MIND_*`, `provisionUrl` = `https://mind.heeca.com.br/api/heeca`, segredo = `HEECA_PLATFORM_SECRET`).
+2. Notify: `NOTIFY_SECRET_MIND`; `mind` na regex de produtos do `validateTemplate`; templates `heeca_mind_*` (7: lembrete_2h, sessao_online, lista_espera, oferta_horario, formulario, documento, acesso_portal, pesquisa) no catálogo/Meta.
+3. Portal: redirecionador `/a/mind/<slug>` → `https://mind.heeca.com.br/agendar/<slug>`.
+4. R2 `heeca-mind` + token; Coolify (`heeca-mind`, `heeca-mind-db`, cron `/api/cron`); DNS `mind.heeca.com.br`; monitor; `data-accent="mind"` no `ui/tokens.css`.
+5. `ecosystem.ts`/`PENDENCIAS.md`: Health com dois motores (D9).

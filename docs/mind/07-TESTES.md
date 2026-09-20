@@ -55,9 +55,12 @@ Mais dois **negativos** obrigatórios: recepção tenta abrir prontuário (404);
 
 ## 6. O que roda onde
 
+Estado em 20/09/2026: `npm test` = 190 testes puros (heeca-core, notify, registration, br-document, package-rules, document-rules, commission-rules, report-rules, permissions com FINANCE e comissões, appointment-status…); `npm run check:tenant` (16 tentativas cruzadas bloqueadas) e `npm run check:lgpd` verdes; `npm run heeca:sim` cobre provision/entitlement/SSO/Notify. E2E Playwright ainda não existe (verificação manual no navegador em cada etapa).
+
+
 | Momento | Comando |
 |---|---|
 | a cada commit | `npm run typecheck && npm test && npx eslint src` |
 | a cada PR | `npm run build` — o `tsc` não detecta módulo cliente importando Prisma (Turbopack sim) |
-| antes de abrir PR | `npm run check:lgpd && npm run check:heeca && npm run check:notify && npm run check:packages` |
+| antes de abrir PR | `npm run check:lgpd && npm run check:tenant` (+ `npm run heeca:sim` contra o dev server) |
 | release | E2E + checklist de segurança §4 + restore de backup e leitura de nota cifrada |

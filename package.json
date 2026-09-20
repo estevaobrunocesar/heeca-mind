@@ -19,6 +19,7 @@
     "heeca:sim": "tsx scripts/heeca-sim.ts",
     "check:rate-limit": "tsx --conditions=react-server scripts/rate-limit-check.ts",
     "check:lgpd": "tsx --conditions=react-server scripts/lgpd-check.ts",
+    "check:tenant": "tsx --conditions=react-server scripts/tenant-check.ts",
     "rotate-key": "tsx --conditions=react-server scripts/rotate-key.ts",
     "db:deploy": "prisma migrate deploy",
     "docker:build": "docker build -t heeca-mind ."

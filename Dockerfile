@@ -10,7 +10,8 @@ FROM base AS deps
 COPY package.json package-lock.json ./
 # --ignore-scripts: o postinstall (prisma generate) roda no estágio de build,
 # onde existem schema, src/ e as variáveis necessárias.
-RUN npm ci --no-audit --no-fund --ignore-scripts
+# --include=dev: o Coolify injeta NODE_ENV=production como ARG e o npm omitiria dotenv/tsx/typescript, que o build precisa.
+RUN npm ci --include=dev --no-audit --no-fund --ignore-scripts
 
 # ── build ─────────────────────────────────────────────────────
 FROM base AS build

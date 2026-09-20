@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { canManageMembers } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
+import { LogoUploader } from "./logo-uploader";
 import { OrganizationForm } from "./organization-form";
 
 export const metadata: Metadata = { title: "Clínica" };
@@ -14,10 +15,16 @@ export default async function ClinicSettingsPage() {
   const org = await db.organization.findUniqueOrThrow({
     where: { id: actor.organizationId },
     select: {
-      name: true, slug: true, type: true, legalName: true, document: true, contactPhone: true, whatsapp: true, contactEmail: true,
+      name: true, slug: true, type: true, logoUrl: true, legalName: true, document: true, contactPhone: true, whatsapp: true, contactEmail: true,
       website: true, instagram: true, addressLine: true, addressCity: true, addressState: true, addressZip: true, offersOnline: true, offersInPerson: true,
     },
   });
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
-  return <OrganizationForm org={org} publicBaseUrl={base} />;
+  const { logoUrl, ...values } = org;
+  return (
+    <div className="space-y-6">
+      <LogoUploader logoUrl={logoUrl} orgName={org.name} />
+      <OrganizationForm org={values} publicBaseUrl={base} />
+    </div>
+  );
 }

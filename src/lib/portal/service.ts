@@ -32,7 +32,7 @@ export class PortalError extends Error {}
 // ── Entrada ─────────────────────────────────────────────────────────────────
 
 export async function professionalBySlug(slug: string) {
-  return db.professional.findUnique({ where: { slug }, select: { id: true, organizationId: true, displayName: true, isActive: true, organization: { select: { name: true, timezone: true, type: true } } } });
+  return db.professional.findUnique({ where: { slug }, select: { id: true, organizationId: true, displayName: true, isActive: true, organization: { select: { name: true, timezone: true, type: true, logoUrl: true } } } });
 }
 
 /**

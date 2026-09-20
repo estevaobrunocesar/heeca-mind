@@ -35,6 +35,10 @@ export default async function PublicDocumentPage({ params }: PageProps<"/documen
         </div>
       ) : (
         <>
+          {doc.professional.organization.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={doc.professional.organization.logoUrl} alt={doc.professional.organization.name} className="mb-4 max-h-12 max-w-[180px] object-contain" />
+          )}
           <header className="print:hidden">
             <p className="text-sm text-text-muted">
               {doc.professional.displayName} · {doc.professional.organization.name}

@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { formValues, invalid, type FormState } from "@/lib/form";
+import { IMAGE_EXT, IMAGE_MIME, MAX_PHOTO_BYTES, sniffImage } from "@/lib/image";
 import { canManageMembers } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
+import { getStorage } from "@/lib/storage";
 import { organizationSchema } from "@/lib/validation/organization";
 
 /** Cadastro da clínica (§6). Só OWNER — mesma regra da equipe. */
@@ -31,4 +33,44 @@ export async function updateOrganizationAction(_prev: FormState, formData: FormD
   revalidatePath("/configuracoes/clinica");
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────
+// Logo da clínica — mesmo desenho da foto de perfil (storage + chave nova a cada upload)
+// ──────────────────────────────────────────────────────────────
+
+export async function uploadClinicLogoAction(formData: FormData): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const actor = await requireActor();
+  if (!canManageMembers(actor)) return { ok: false, error: "Só o responsável edita os dados da clínica." };
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Selecione uma imagem." };
+  if (file.size > MAX_PHOTO_BYTES) return { ok: false, error: "Imagem muito grande (máx. 1,5 MB)." };
+
+  const buf = Buffer.from(await file.arrayBuffer());
+  const kind = sniffImage(buf);
+  if (!kind) return { ok: false, error: "Formato não suportado. Use PNG, JPG ou WebP." };
+
+  const orgId = actor.organizationId;
+  const before = await db.organization.findUniqueOrThrow({ where: { id: orgId }, select: { logoKey: true, logoUrl: true } });
+  const storage = getStorage();
+  const { key, url } = await storage.put({ key: `organizations/${orgId}/logo-${Date.now()}.${IMAGE_EXT[kind]}`, body: buf, contentType: IMAGE_MIME[kind] });
+  await db.organization.update({ where: { id: orgId }, data: { logoUrl: url, logoKey: key } });
+  if (before.logoKey && before.logoKey !== key) await storage.delete(before.logoKey).catch(() => {}); // melhor esforço: a nova já está salva
+
+  await audit(actor, { organizationId: orgId, action: "organization.logo", entityType: "Organization", entityId: orgId, before: { logoUrl: before.logoUrl }, after: { logoUrl: url } });
+  revalidatePath("/configuracoes/clinica");
+  revalidatePath("/", "layout");
+  return { ok: true, url };
+}
+
+export async function removeClinicLogoAction(): Promise<void> {
+  const actor = await requireActor();
+  if (!canManageMembers(actor)) return;
+  const orgId = actor.organizationId;
+  const before = await db.organization.findUniqueOrThrow({ where: { id: orgId }, select: { logoKey: true, logoUrl: true } });
+  await db.organization.update({ where: { id: orgId }, data: { logoUrl: null, logoKey: null } });
+  if (before.logoKey) await getStorage().delete(before.logoKey).catch(() => {});
+  await audit(actor, { organizationId: orgId, action: "organization.logo_remove", entityType: "Organization", entityId: orgId, before: { logoUrl: before.logoUrl } });
+  revalidatePath("/configuracoes/clinica");
+  revalidatePath("/", "layout");
 }

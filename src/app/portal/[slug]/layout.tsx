@@ -17,7 +17,11 @@ export default async function PortalLayout({ children, params }: { children: Rea
     <div className="flex min-h-screen flex-col">
       <header className="border-b-[3px] border-primary bg-surface">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4">
-          <Link href={`/portal/${slug}`} className="font-semibold tracking-tight">
+          <Link href={`/portal/${slug}`} className="flex items-center gap-3 font-semibold tracking-tight">
+            {pro.organization.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={pro.organization.logoUrl} alt="" className="h-8 max-w-[120px] object-contain" />
+            )}
             {title}
           </Link>
           {actor && (

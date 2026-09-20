@@ -48,7 +48,7 @@
 | 5 Portal do paciente | ✅ | 1d86511 |
 | 6 Comissões | ✅ | fc3d432 |
 | 7 Dashboard, relatórios, reativação, pesquisa | ✅ | 5419f01 |
-| 8 Endurecimento | ✅ | `check:tenant`, `check:lgpd`, dump-grep, build; E2E Playwright (`npm run e2e`, 6 specs) entregue depois do merge |
+| 8 Endurecimento | ✅ | `check:tenant`, `check:lgpd`, dump-grep, build; E2E Playwright (`npm run e2e`, 7 specs) entregue depois do merge |
 
 O que **depende da plataforma** para o Mind ir ao ar está em `docs/DEPLOY.md` §5 e na seção 8 deste documento.
 
@@ -140,7 +140,6 @@ Todas implementadas conforme a coluna "Recomendação", exceto D7 (cor do produt
 
 ## 7. Dívidas conhecidas (não bloqueiam o §41)
 
-- Logo da clínica: coluna existe, upload não.
 - Cor de acento do Mind (D7).
 
 ## 8. Tarefas da plataforma para a prateleira (chat da plataforma)

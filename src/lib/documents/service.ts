@@ -140,7 +140,7 @@ export async function revokeDocument(actor: Actor, requestId: string, reason: st
 export async function loadDocumentByToken(token: string) {
   const r = await db.documentRequest.findUnique({
     where: { tokenHash: hashToken(token) },
-    select: { id: true, status: true, expiresAt: true, titleSnapshot: true, bodySnapshot: true, bodyHash: true, acceptedAt: true, acceptName: true, templateVersion: true, kind: true, patient: { select: { name: true } }, professional: { select: { displayName: true, organization: { select: { name: true, timezone: true } } } } },
+    select: { id: true, status: true, expiresAt: true, titleSnapshot: true, bodySnapshot: true, bodyHash: true, acceptedAt: true, acceptName: true, templateVersion: true, kind: true, patient: { select: { name: true } }, professional: { select: { displayName: true, organization: { select: { name: true, timezone: true, logoUrl: true } } } } },
   });
   if (!r) return null;
   // Primeira abertura: registra visualização (não é aceite).

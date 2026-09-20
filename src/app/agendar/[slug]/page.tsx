@@ -35,6 +35,7 @@ async function getPublicProfile(slug: string) {
         select: { id: true, name: true, description: true, durationMinutes: true, priceCents: true, modality: true },
       },
       policy: { select: { cancellationPolicy: true, reschedulePolicy: true } },
+      organization: { select: { type: true, name: true, logoUrl: true } },
     },
   });
 }
@@ -61,6 +62,10 @@ export default async function PublicBookingPage({ params }: PageProps<"/agendar/
   return (
     <main className="mx-auto w-full max-w-lg px-4 py-8">
       <header className="flex flex-col items-center text-center">
+        {p.organization.type === "CLINIC" && p.organization.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.organization.logoUrl} alt={p.organization.name} className="mb-5 max-h-16 max-w-[220px] object-contain" />
+        )}
         {p.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={p.photoUrl} alt="" className="h-24 w-24 rounded-full object-cover" />

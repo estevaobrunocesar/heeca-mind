@@ -19,6 +19,7 @@
     "webhook:sim": "tsx scripts/simulate-webhook.ts",
     "check:rate-limit": "tsx --conditions=react-server scripts/rate-limit-check.ts",
     "check:lgpd": "tsx --conditions=react-server scripts/lgpd-check.ts",
+    "rotate-key": "tsx --conditions=react-server scripts/rotate-key.ts",
     "db:deploy": "prisma migrate deploy",
     "docker:build": "docker build -t hecca-psico ."
   },

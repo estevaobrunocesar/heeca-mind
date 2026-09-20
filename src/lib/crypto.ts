@@ -1,51 +1,40 @@
 import "server-only";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import * as core from "./crypto-core";
 
 /**
- * Cifragem simétrica de campos sensíveis (anotações clínicas, segredo MFA).
+ * Cifragem simétrica de campos e arquivos sensíveis (notas clínicas,
+ * documentos, respostas de formulários, segredo MFA).
  *
- * Formato do texto cifrado (base64): [iv:12 bytes][authTag:16 bytes][ciphertext]
- * AES-256-GCM garante confidencialidade + integridade: qualquer alteração no
- * banco faz a decifragem falhar em vez de devolver lixo silenciosamente.
+ * Chaveiro vem do ambiente:
+ *   ENCRYPTION_KEY           chave atual (cifra o que é novo)
+ *   ENCRYPTION_KEY_PREVIOUS  chaves antigas, separadas por vírgula, só para decifrar
+ *
+ * Rotação: troque ENCRYPTION_KEY pela nova, coloque a antiga em
+ * ENCRYPTION_KEY_PREVIOUS, faça deploy, rode `npm run rotate-key` até zerar
+ * e então remova a antiga. Detalhes em docs/DEPLOY.md.
+ *
+ * Formato e regras: src/lib/crypto-core.ts (puro, testado).
  */
 
-const ALGO = "aes-256-gcm";
-const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
+let cached: { sig: string; ring: core.Keyring } | null = null;
 
-function getKey(): Buffer {
-  const raw = process.env.ENCRYPTION_KEY;
-  if (!raw) throw new Error("ENCRYPTION_KEY não definida");
-  const key = Buffer.from(raw, "base64");
-  if (key.length !== 32) {
-    throw new Error("ENCRYPTION_KEY deve ter 32 bytes em base64 (openssl rand -base64 32)");
-  }
-  return key;
+export function keyring(): core.Keyring {
+  const primary = process.env.ENCRYPTION_KEY;
+  if (!primary) throw new Error("ENCRYPTION_KEY não definida");
+  const previous = process.env.ENCRYPTION_KEY_PREVIOUS ?? "";
+  const sig = `${primary}|${previous}`;
+  if (!cached || cached.sig !== sig) cached = { sig, ring: core.makeKeyring(primary, previous) };
+  return cached.ring;
 }
 
-/** Cifra bytes (arquivos do prontuário). Saída: iv + tag + ciphertext. */
-export function encryptBytes(plaintext: Buffer): Buffer {
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGO, getKey(), iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, ciphertext]);
-}
+export const currentKeyId = () => core.keyIdOf(keyring().primary);
 
-export function decryptBytes(payload: Buffer): Buffer {
-  if (payload.length < IV_LENGTH + TAG_LENGTH) throw new Error("Payload cifrado inválido");
-  const iv = payload.subarray(0, IV_LENGTH);
-  const tag = payload.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
-  const ciphertext = payload.subarray(IV_LENGTH + TAG_LENGTH);
-  const decipher = createDecipheriv(ALGO, getKey(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-}
+export const encrypt = (plaintext: string) => core.encrypt(keyring(), plaintext);
+export const decrypt = (payload: string) => core.decrypt(keyring(), payload);
+export const encryptBytes = (plaintext: Buffer) => core.encryptBytes(keyring(), plaintext);
+export const decryptBytes = (data: Buffer) => core.decryptBytes(keyring(), data);
 
-export function encrypt(plaintext: string): string {
-  return encryptBytes(Buffer.from(plaintext, "utf8")).toString("base64");
-}
-
-export function decrypt(payload: string): string {
-  return decryptBytes(Buffer.from(payload, "base64")).toString("utf8");
-}
+/** Para o job de rotação. */
+export const isCurrent = (payload: string | Buffer) => core.isCurrent(keyring(), payload);
+export const rotateText = (payload: string) => core.rotateText(keyring(), payload);
+export const rotateBytes = (data: Buffer) => core.rotateBytes(keyring(), data);

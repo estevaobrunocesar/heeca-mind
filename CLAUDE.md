@@ -162,6 +162,12 @@ prisma/                schema, migrations, seed
 - Vercel: `vercel.json` (região gru1 + cron); use URL de banco com pooler; `STORAGE_DRIVER=s3`.
 - Seed bloqueado em produção (`ALLOW_SEED=1` força).
 
+## Cifra e rotação de chave
+
+- `src/lib/crypto-core.ts` é puro e testado; `src/lib/crypto.ts` só liga ao ambiente (`ENCRYPTION_KEY` + `ENCRYPTION_KEY_PREVIOUS`). Todo dado novo leva o `keyId` (8 hex de sha256 da chave) no envelope: texto `k1:<keyId>:<base64>`, blob `\0HPENC\x01<len><keyId>…`. Dado sem envelope é legado: decifra por tentativa em cada chave do chaveiro (o tag do GCM rejeita a errada).
+- Rotação: `npm run rotate-key [-- --check]` (`src/lib/key-rotation.ts`) recifra o que não está na chave atual; idempotente, resumível, blob vai para storageKey novo antes de trocar a linha. Procedimento em docs/DEPLOY.md §7.
+- **Ao criar um campo cifrado novo, adicione-o a `rotateAllKeys`** — senão a rotação o deixa para trás e a chave antiga não poderá ser removida.
+
 ## Prontuário (dados clínicos)
 
 - Regra de acesso decidida em 2026-09-19: `canAccessClinicalData` (pura) = ator é PROFESSIONAL/OWNER **com perfil** e é exatamente o profissional; + `isTreatingProfessional` (banco) = tem/teve sessão com o paciente. Dono sem perfil, dono-psicólogo de outro paciente e recepção: nunca. O seletor de profissional (`activeProfessionalId`) NÃO transfere acesso clínico. Supervisão/substituição só por delegação explícita (seção abaixo).

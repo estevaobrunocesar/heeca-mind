@@ -16,6 +16,10 @@ const schema = z
     DATABASE_URL: z.string().url("deve ser uma URL postgresql://"),
     AUTH_SECRET: z.string().min(32, "mínimo de 32 caracteres (openssl rand -base64 32)"),
     ENCRYPTION_KEY: base64Key,
+    ENCRYPTION_KEY_PREVIOUS: z
+      .string()
+      .optional()
+      .refine((v) => !v || v.split(",").every((k) => k.trim() === "" || Buffer.from(k.trim(), "base64").length === 32), "cada chave anterior deve ter 32 bytes em base64, separadas por vírgula"),
     NEXT_PUBLIC_APP_URL: z.string().url("deve ser a URL pública com https://"),
     CRON_SECRET: z.string().min(16).optional(),
     STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
@@ -73,6 +77,7 @@ export function validateEnv(source: NodeJS.ProcessEnv = process.env): Env {
 /** Avisos não fatais: recursos que ficam em modo degradado. */
 export function envWarnings(e: Env): string[] {
   const w: string[] = [];
+  if (e.ENCRYPTION_KEY_PREVIOUS?.trim()) w.push("Rotação de chave em andamento (ENCRYPTION_KEY_PREVIOUS definida): rode npm run rotate-key até pendentes = 0 e remova a variável.");
   if (!e.WHATSAPP_ACCESS_TOKEN) w.push("WhatsApp sem credenciais: mensagens só vão para o log (ConsoleWhatsAppProvider).");
   if (e.STORAGE_DRIVER === "local" && e.NODE_ENV === "production") w.push("STORAGE_DRIVER=local em produção: só funciona com filesystem persistente (VPS/Docker com volume), não em serverless.");
   return w;

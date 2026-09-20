@@ -24,7 +24,8 @@ openssl rand -hex 24      # CRON_SECRET
 |---|---|---|
 | `DATABASE_URL` | sim | Em serverless use a URL **pooled** (`?pgbouncer=true` no Supabase; `-pooler` no Neon). |
 | `AUTH_SECRET` | sim | Assina o JWT. Trocar derruba todas as sessões. |
-| `ENCRYPTION_KEY` | sim | Cifra notas clínicas e segredos MFA. **Perder = perder os dados cifrados.** Guarde em cofre. Nunca reutilize entre ambientes. |
+| `ENCRYPTION_KEY` | sim | Cifra notas clínicas, documentos, respostas de formulários e segredos MFA. **Perder = perder os dados cifrados.** Guarde em cofre. Nunca reutilize entre ambientes. |
+| `ENCRYPTION_KEY_PREVIOUS` | | Só durante uma rotação: chave(s) antiga(s), separadas por vírgula, para decifrar. Ver seção 7. |
 | `NEXT_PUBLIC_APP_URL` | sim | `https://…` — vai nos links de WhatsApp e no QR do MFA. |
 | `CRON_SECRET` | sim (prod) | `Authorization: Bearer` do `/api/cron`. |
 | `AUTH_TRUST_HOST` | Docker | `true` atrás de proxy (fora da Vercel). |
@@ -102,4 +103,10 @@ Resumo — detalhes e textos dos templates em `docs/WHATSAPP.md`:
 
 - Logs de acesso/alteração: tabelas `access_logs` e `audit_logs` (ações `entidade.verbo`).
 - Sessões: `user_sessions` — revogue pela UI ou `UPDATE user_sessions SET "revokedAt"=now() WHERE "userId"=…`.
-- Rotação de `ENCRYPTION_KEY`: não há rotação automática. Decifre com a antiga e recifre com a nova (`src/lib/crypto.ts`) antes de trocar a variável.
+- Rotação de `ENCRYPTION_KEY` (sem parada, sem perda):
+  1. Gere a nova: `openssl rand -base64 32`.
+  2. Defina `ENCRYPTION_KEY=<nova>` e `ENCRYPTION_KEY_PREVIOUS=<antiga>` (várias antigas: separadas por vírgula). Faça o deploy. A partir daqui tudo que é novo é cifrado com a nova; o antigo continua legível.
+  3. `npm run rotate-key -- --check` mostra quantos registros ainda estão na antiga (não grava nada). `npm run rotate-key` recifra notas, respostas de formulário, segredos MFA e documentos (campos + blob no storage). Idempotente: pode repetir; pode rodar com o app no ar.
+  4. Quando terminar com `pendentes: 0 · falhas: 0`, remova `ENCRYPTION_KEY_PREVIOUS` e faça o deploy. A chave antiga pode ser destruída.
+  Enquanto `ENCRYPTION_KEY_PREVIOUS` existir, o app registra um aviso no boot. No Docker: `docker compose -f docker-compose.prod.yml exec app node prisma-cli/...` não serve — rode o script numa máquina com o código e as duas variáveis (`npx tsx --conditions=react-server scripts/rotate-key.ts`), apontando para o banco e o storage de produção.
+  Se uma chave for **perdida** antes da rotação terminar, os registros que ainda estavam nela são irrecuperáveis — por isso o `--check` antes de apagar qualquer chave.

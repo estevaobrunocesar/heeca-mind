@@ -126,3 +126,8 @@ npm run heeca:sim -- notify button +5511999990000 confirm:<token>     # confirma
   4. Quando terminar com `pendentes: 0 · falhas: 0`, remova `ENCRYPTION_KEY_PREVIOUS` e faça o deploy. A chave antiga pode ser destruída.
   Enquanto `ENCRYPTION_KEY_PREVIOUS` existir, o app registra um aviso no boot. No Docker: `docker compose -f docker-compose.prod.yml exec app node prisma-cli/...` não serve — rode o script numa máquina com o código e as duas variáveis (`npx tsx --conditions=react-server scripts/rotate-key.ts`), apontando para o banco e o storage de produção.
   Se uma chave for **perdida** antes da rotação terminar, os registros que ainda estavam nela são irrecuperáveis — por isso o `--check` antes de apagar qualquer chave.
+
+## 8. Coolify (aprendido no go-live de 20/09/2026)
+
+- O Coolify injeta **todas** as variáveis como `ARG` no Dockerfile, inclusive `NODE_ENV=production`; por isso o estágio `deps` usa `npm ci --include=dev` (senão `dotenv`, `tsx` e `typescript` ficam de fora e o `prisma generate`/`next build` falham).
+- O Next standalone escuta em `0.0.0.0:3000` (só IPv4). No Alpine, `localhost` resolve para `::1` → o healthcheck do Coolify e a Scheduled Task do cron precisam usar **`127.0.0.1`** (`health_check_host` do app e o `wget` do cron). Sintoma: build ok, container sobe, healthcheck "Connection refused" 12 vezes e o deploy é revertido.

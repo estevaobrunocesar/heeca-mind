@@ -83,3 +83,13 @@ describe("inboundToWebhookEvent (Notify → evento bruto)", () => {
     assert.equal(inboundToWebhookEvent({ type: "x", providerMessageId: "m" } as never), null);
   });
 });
+
+describe("templates com botão exigem token (regressão: sessão manual sem confirmationToken)", () => {
+  it("todo template unificado ou específico com quick_reply/URL de token é detectável pela spec", () => {
+    const needsToken = (Object.keys(TEMPLATES) as (keyof typeof TEMPLATES)[]).filter((k) => TEMPLATES[k].buttons?.some((b) => b.type === "quick_reply" || (b.type === "url" && b.suffix === "confirmationToken")));
+    // REMINDER_24H ganhou botões no catálogo unificado: quem enfileira precisa garantir o token.
+    assert.ok(needsToken.includes("REMINDER_24H"));
+    assert.ok(needsToken.includes("BOOKING_REQUEST"));
+    assert.ok(!needsToken.includes("BOOKING_CONFIRMED"));
+  });
+});

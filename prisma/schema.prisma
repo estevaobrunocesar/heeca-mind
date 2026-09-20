@@ -496,6 +496,8 @@ model Patient {
   tags                PatientTag[]
   packagePurchases    PackagePurchase[]
   documentRequests    DocumentRequest[]
+  portalTokens        PatientAccessToken[]
+  portalSessions      PatientSession[]
 
   @@unique([organizationId, whatsapp])
   @@index([organizationId, name])
@@ -845,6 +847,47 @@ model DocumentRequest {
   @@map("document_requests")
 }
 
+// ───────────────────────────────────────────────────────────────
+// PORTAL DO PACIENTE (§17, D4: link mágico por WhatsApp) — src/lib/portal/
+// Sessão própria, separada do Auth.js: o paciente nunca é um User.
+// ───────────────────────────────────────────────────────────────
+
+/// Link mágico: 15 minutos, uso único. Prova a posse do número (a identidade do paciente).
+model PatientAccessToken {
+  id             String    @id @default(cuid())
+  organizationId String
+  patientId      String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  requestIp      String?
+  createdAt      DateTime  @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, expiresAt])
+  @@map("patient_access_tokens")
+}
+
+/// Sessão do portal (cookie hm_patient = sid). 30 dias; revogável pela recepção.
+model PatientSession {
+  id             String    @id @default(cuid())
+  organizationId String
+  patientId      String
+  sid            String    @unique
+  expiresAt      DateTime
+  lastSeenAt     DateTime  @default(now())
+  userAgent      String?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, revokedAt])
+  @@index([expiresAt])
+  @@map("patient_sessions")
+}
+
 model PackageConsumption {
   id                String    @id @default(cuid())
   packagePurchaseId String
@@ -898,6 +941,7 @@ enum NotificationType {
   WAITLIST_OFFER // surgiu um horário; confirmar pelo link
   FORM_REQUEST // preencher formulário pré-atendimento
   DOCUMENT_REQUEST // ler e aceitar documento (termo, contrato)
+  PORTAL_LOGIN // link mágico de acesso ao portal do paciente
   // Avisos ao PROFISSIONAL (canal EMAIL; payload = { subject, text, html })
   PRO_BOOKING_REQUESTED
   PRO_BOOKING_CONFIRMED

@@ -18,6 +18,7 @@ import { purgeStaleMfaVerifications } from "@/lib/mfa/service";
 import { purgeSessions } from "@/lib/sessions";
 import { expirePurchases } from "@/lib/packages/service";
 import { autoSendRequiredDocuments, expireDocumentRequests } from "@/lib/documents/service";
+import { purgePortal } from "@/lib/portal/service";
 
 /**
  * Rotinas periódicas do WhatsApp. Chamadas pelo cron (src/app/api/cron) a
@@ -297,7 +298,8 @@ export async function runCron() {
   const purgedWebhookEvents = await purgeOldWebhookEvents();
   const packagesExpired = await expirePurchases();
   const documents = { expired: await expireDocumentRequests(), autoSent: await autoSendRequiredDocuments() };
+  const portal = await purgePortal();
   const purgedMfa = await purgeStaleMfaVerifications();
   const purgedSessions = await purgeSessions();
-  return { webhook, expiry, waitlistSynced, forms, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, packagesExpired, documents, purgedMfa, purgedSessions, at: new Date().toISOString() };
+  return { webhook, expiry, waitlistSynced, forms, dispatch, purgedRateLimits, lgpd, purgedWebhookEvents, packagesExpired, documents, portal, purgedMfa, purgedSessions, at: new Date().toISOString() };
 }

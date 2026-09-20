@@ -21,6 +21,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   WAITLIST_OFFER: "Oferta de horário",
   FORM_REQUEST: "Formulário",
   DOCUMENT_REQUEST: "Documento",
+  PORTAL_LOGIN: "Acesso ao portal",
   PRO_BOOKING_REQUESTED: "Aviso: novo pedido",
   PRO_BOOKING_CONFIRMED: "Aviso: confirmou",
   PRO_BOOKING_CANCELLED: "Aviso: cancelou",

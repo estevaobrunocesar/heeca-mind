@@ -1,4 +1,5 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
 import { db } from "./db";
 import { formatDateBR, slotLabelInTz } from "./time";
 import { buildButtons, buildVariables, TEMPLATES, type WhatsAppNotificationType, type WhatsAppPayload } from "./whatsapp/templates";
@@ -64,10 +65,17 @@ export async function enqueueAppointmentNotification(
   };
 
   const spec = TEMPLATES[type];
+  // Botões (quick_reply e URL) carregam o token da sessão. Sessões criadas manualmente nascem sem
+  // token; o primeiro template com botão o cria — é só um identificador não adivinhável.
+  let confirmationToken = a.confirmationToken;
+  if (!confirmationToken && spec.buttons?.some((b) => b.type === "quick_reply" || b.suffix === "confirmationToken")) {
+    confirmationToken = randomBytes(24).toString("base64url");
+    await db.appointment.update({ where: { id: a.id }, data: { confirmationToken } });
+  }
   const payload: WhatsAppPayload = {
     bodyVariables: buildVariables(type, values),
     // Sufixos/payloads dos botões: sempre o token (não adivinhável) ou o slug público, nunca o id.
-    buttons: buildButtons(type, { confirmationToken: a.confirmationToken, professionalSlug: a.professional.slug }),
+    buttons: buildButtons(type, { confirmationToken, professionalSlug: a.professional.slug }),
   };
 
   return db.notification.create({
@@ -168,6 +176,24 @@ export async function enqueueFormRequest(requestId: string, token: string) {
         }),
         buttons: buildButtons(type, { formToken: token }),
       } satisfies WhatsAppPayload,
+    },
+  });
+}
+
+/** Link mágico do portal do paciente (D4). Token em claro só na mensagem; 15 min; uso único. */
+export async function enqueuePortalLogin(patientId: string, token: string) {
+  const p = await db.patient.findUniqueOrThrow({ where: { id: patientId }, select: { id: true, organizationId: true, name: true, whatsapp: true, organization: { select: { name: true, type: true, professionals: { where: { isActive: true }, orderBy: { createdAt: "asc" }, take: 1, select: { displayName: true } } } } } });
+  const type = "PORTAL_LOGIN" as const;
+  const establishment = p.organization.type === "CLINIC" ? p.organization.name : (p.organization.professionals[0]?.displayName ?? p.organization.name);
+  return db.notification.create({
+    data: {
+      organizationId: p.organizationId,
+      patientId: p.id,
+      channel: "WHATSAPP",
+      type,
+      recipient: p.whatsapp,
+      templateName: TEMPLATES[type].name,
+      payload: { bodyVariables: buildVariables(type, { patientFirstName: p.name.split(" ")[0] ?? p.name, establishment }), buttons: buildButtons(type, { portalToken: token }) } satisfies WhatsAppPayload,
     },
   });
 }

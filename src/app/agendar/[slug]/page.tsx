@@ -142,6 +142,12 @@ export default async function PublicBookingPage({ params }: PageProps<"/agendar/
           Falar no WhatsApp
         </a>
       )}
+      <p className="mt-6 text-center text-sm text-text-muted">
+        Já é paciente?{" "}
+        <Link href={`/portal/${slug}`} className="text-primary hover:underline">
+          Acesse seu portal
+        </Link>
+      </p>
     </main>
   );
 }

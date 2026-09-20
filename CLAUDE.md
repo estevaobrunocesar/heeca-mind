@@ -61,6 +61,7 @@ prisma/                schema, migrations, seed
 | 9 Financeiro | ✅ pagamento (parcial/integral/isento/desfazer) na sessão, /financeiro por mês com realizado/recebido/a receber/previsto (+ pacotes vendidos), marcar pago em 1 clique, CSV com origem |
 | 10 Pacotes | ✅ catálogo, venda na ficha, vínculo/auto-vínculo, consumo em concluída/falta (política), reversão, expiração |
 | 11 Documentos | ✅ modelos versionados com variáveis, envio por WhatsApp, aceite com hash, registro imprimível, envio automático na 1ª sessão |
+| 12 Portal do paciente | ✅ link mágico, sessões, reagendar/cancelar pela política, pagamentos, pacotes, documentos, dados próprios |
 
 ## Segmento e registro profissional (Mind, etapa 0)
 
@@ -91,6 +92,13 @@ prisma/                schema, migrations, seed
 - Aceite em `/documento/[token]` (rota pública no proxy): nome precisa conferir com o cadastro; grava nome, IP, UA, hash; e-mail `PRO_DOCUMENT_ACCEPTED` ao profissional; WhatsApp `heeca_mind_documento`. Aceito não se cancela — envia-se nova versão. "PDF" = página de impressão (`PrintButton`), como o prontuário.
 - Anonimização (D6): mantém texto e hashes, zera nome/IP/UA; pendentes viram REVOKED. Registro interno em `/pacientes/[id]/documentos/[requestId]` (auditado como `document.view_record`).
 - Os `FormTemplate` com `dataClass=ADMINISTRATIVE` continuam válidos como questionários; termos novos devem nascer como documentos.
+
+## Portal do paciente (Mind, etapa 5 — §17, D4)
+
+- `/portal/[slug]` (slug do profissional dá o tenant). Entrada por **link mágico no WhatsApp** (`PatientAccessToken`, 15 min, uso único, template `heeca_mind_acesso_portal`); resposta sempre neutra (não revela se o número existe); rate limit `portal:phone` 3/h e `portal:ip`. `/portal/entrar/[token]` troca por `PatientSession` + cookie `hm_patient` (HttpOnly, path `/portal`, 30 dias) — **nunca** sessão do Auth.js; o paciente não é User.
+- `src/lib/portal/service.ts`: `getPortalActor(organizationId)` (sessão válida e da organização do slug), home (sessões, pagamentos em aberto, pacotes, documentos), `patientCanChange` (status ativo + prazo `minCancelHours`/`minRescheduleHours`), cancelar/reagendar (mesma disponibilidade da página pública com `excludeAppointmentId`; `isSlotAvailable` reconferido no servidor), abrir documento pendente (gira o token), dados próprios (nunca nome/WhatsApp), `revokePatientSessions`, `purgePortal` no cron.
+- Nada clínico é lido no portal — nem por engano: as queries selecionam só campos administrativos. Ações do paciente auditam com `actor = null` e `after.by = "portal"`.
+- Sessões criadas manualmente não têm `confirmationToken`; `enqueueAppointmentNotification` cria um quando o template exige botão (os unificados `heeca_lembrete`/`heeca_confirmacao` exigem).
 
 ## Padrões de formulário
 
@@ -192,7 +200,7 @@ prisma/                schema, migrations, seed
 - Seletor de profissional: cookie `hp_pro` (`setActiveProfessionalAction`), validado no tenant a cada requisição em `resolveActiveProfessional`. PROFESSIONAL ignora o cookie.
 - Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com registro profissional/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.
 - Página pública da clínica: `/clinica/[slug]` (Organization.slug) lista profissionais ativos → `/agendar/[slug]`.
-- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica|formulario|sso`.
+- Rotas públicas no proxy: `agendar|confirmar|sessao|convite|clinica|formulario|documento|portal|sso`.
 - Migrações com aviso interativo (índice único): `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` para a pasta e `prisma migrate deploy`.
 
 ## Deploy (ver docs/DEPLOY.md)

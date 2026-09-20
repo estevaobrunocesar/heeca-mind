@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canTransition, targetStatus, type AppointmentAction } from "@/lib/appointment-status";
 import { autoLinkPackage, consumeIfDue } from "@/lib/packages/service";
+import { scheduleSurveyForAppointment } from "@/lib/reports/service";
 import { audit } from "@/lib/audit";
 import { addDaysCivil, findHardConflicts, weekdayOfCivilDate } from "@/lib/availability";
 import { ACTIVE_STATUSES } from "@/lib/availability-data";
@@ -249,6 +250,7 @@ export async function completeAppointmentAction(appointmentId: string) {
   const { after } = await transition(appointmentId, "complete", { completedAt: new Date() });
   // Base da reativação (§28): a última sessão concluída fica na ficha, sem varrer a agenda.
   await db.patient.updateMany({ where: { id: after.patientId, OR: [{ lastCompletedAt: null }, { lastCompletedAt: { lt: after.startsAt } }] }, data: { lastCompletedAt: after.startsAt } });
+  await scheduleSurveyForAppointment(after.id); // §29: pesquisa administrativa 24 h depois, se o profissional ativou
 }
 
 export async function noShowAppointmentAction(appointmentId: string) {

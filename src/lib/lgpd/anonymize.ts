@@ -75,6 +75,8 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
     // D6: o termo aceito é prova contratual — fica o texto e o hash; sai o que identifica a pessoa.
     await tx.documentRequest.updateMany({ where: { patientId }, data: { acceptName: null, acceptIp: null, acceptUserAgent: null } });
     await tx.documentRequest.updateMany({ where: { patientId, status: { in: ["PENDING", "VIEWED"] } }, data: { status: "REVOKED", revokeReason: "anonimização" } });
+    await tx.experienceSurvey.updateMany({ where: { patientId }, data: { comment: null } }); // nota fica (agregado), texto sai
+    await tx.reactivationContact.deleteMany({ where: { patientId } });
     await tx.patientAccessToken.deleteMany({ where: { patientId } });
     await tx.patientSession.deleteMany({ where: { patientId } });
     await tx.waitlistEntry.updateMany({ where: { patientId }, data: { note: null, removedReason: null, status: "REMOVED" } });

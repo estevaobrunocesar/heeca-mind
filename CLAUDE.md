@@ -15,7 +15,9 @@ Vertical de saúde mental da plataforma Heeca (antes "Hecca Psico"; o produto fo
 docker compose up -d          # Postgres local na porta 5433
 npm run db:migrate            # prisma migrate dev
 npm run db:seed               # ana@exemplo.com / senha12345 → /agendar/dra-ana-lucia
-npm run dev
+npm run dev                   # após mudar o schema: prisma generate + reiniciar (o processo guarda o client antigo)
+# NUNCA rode `npm run build` ou `next typegen` com o dev server ligado: corrompe .next/dev e rotas passam a dar 404.
+# Se acontecer: parar o dev, `rm -rf .next`, subir de novo.
 npm run cron                  # roda dispatcher/expiração/webhook uma vez (dev)
 npm run heeca:sim -- provision ana@exemplo.com          # simula o portal (provision/entitlement/sso) e o Notify (callbacks)
 npm test
@@ -63,6 +65,7 @@ prisma/                schema, migrations, seed
 | 11 Documentos | ✅ modelos versionados com variáveis, envio por WhatsApp, aceite com hash, registro imprimível, envio automático na 1ª sessão |
 | 12 Portal do paciente | ✅ link mágico, sessões, reagendar/cancelar pela política, pagamentos, pacotes, documentos, dados próprios |
 | 13 Comissões | ✅ regras por profissional/serviço, lançamento por pagamento recebido, fechamento imutável, estorno, ajuste, CSV |
+| 14 Relatórios e retenção | ✅ /relatorios (§27) com definições explícitas, cards §26 no dashboard, reativação por clique, pesquisa de experiência |
 
 ## Segmento e registro profissional (Mind, etapa 0)
 
@@ -107,6 +110,12 @@ prisma/                schema, migrations, seed
 - `src/lib/commissions/rules.ts` (puro, testado): `pickRule` (serviço > geral; mais recente vence; validade inclusiva), `computeAmount` (basis points, arredonda para baixo), `packagePaymentAmount` (percentual sobre o pago; fixo proporcional às sessões pagas), `openTotal`, `validateRule`.
 - `CommissionEntry` nunca é editado. Fechamento (`closePeriod`) é imutável: estorno de pagamento já fechado vira lançamento **REVERSAL negativo** em aberto; ajuste manual é ADJUSTMENT. Regras não se apagam — encerram a vigência (`validTo`).
 - Permissões: `canViewCommissions` (OWNER/FINANCE todos; PROFESSIONAL só o próprio), `canManageCommissions` (OWNER/FINANCE). Telas: `/financeiro/comissoes` (+ CSV auditado), `/configuracoes/comissoes`.
+
+## Dashboard, relatórios, reativação e pesquisa (Mind, etapa 7 — §26–§29)
+
+- `src/lib/reports/rules.ts` (puro, testado) define cada indicador e a UI mostra "como é calculado": ocupação = minutos ocupados ÷ minutos de grade (`workingMinutes`, capacidade nominal sem bloqueios); ticket médio = recebido ÷ concluídas cobradas; clientes novo/ativo/recorrente/inativo e retenção (`clientCohorts`); `surveySummary`; `reactivationCandidates`. `/relatorios` (OWNER/FINANCE: clínica toda ou por profissional; PROFESSIONAL: o próprio; valores só com `canViewFinancials`). Dashboard ganhou novos/inativos/ocupação 7 dias/lista de espera.
+- **Pesquisa de experiência** (`ExperienceSurvey`): liga em Políticas (`surveyEnabled`); `scheduleSurveyForAppointment` no `completeAppointmentAction` cria a pesquisa e enfileira `heeca_mind_pesquisa` para +24 h; `/pesquisa/[token]` (pública, uso único, 0–10 + comentário). Administrativa e privada — texto na UI diz explicitamente que não é sobre o acompanhamento. Anonimização zera o comentário e mantém a nota.
+- **Reativação** (`/pacientes/reativacao`): lista = `reactivationCandidates` com `ProfessionalPolicy.reactivationAfterDays`; **nada automático** — cada convite é um clique que enfileira o unificado `heeca_retorno` (frase configurável `reactivationInviteText`, botão Agendar → `/a/mind/<slug>`) e grava `ReactivationContact` (não repete antes de N dias).
 
 ## Padrões de formulário
 

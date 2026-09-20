@@ -4,6 +4,7 @@ import { db } from "./db";
 import { formatDateBR, slotLabelInTz } from "./time";
 import { buildButtons, buildVariables, TEMPLATES, type WhatsAppNotificationType, type WhatsAppPayload } from "./whatsapp/templates";
 import { parseCommsPrefs, reminderAllowed } from "./comms-prefs";
+import { DEFAULT_REACTIVATION_TEXT } from "./reports/rules";
 
 /**
  * Enfileira notificações de WhatsApp para um agendamento.
@@ -176,6 +177,38 @@ export async function enqueueFormRequest(requestId: string, token: string) {
         }),
         buttons: buildButtons(type, { formToken: token }),
       } satisfies WhatsAppPayload,
+    },
+  });
+}
+
+function establishmentOf(org: { name: string; type: string }, proName: string) {
+  return org.type === "CLINIC" ? org.name : proName;
+}
+
+/** Pesquisa de experiência (§29), agendada para depois da sessão. */
+export async function enqueueSurvey(surveyId: string, token: string, scheduledFor: Date) {
+  const s = await db.experienceSurvey.findUniqueOrThrow({ where: { id: surveyId }, select: { organizationId: true, appointmentId: true, patient: { select: { id: true, name: true, whatsapp: true } }, professional: { select: { displayName: true, organization: { select: { name: true, type: true } } } } } });
+  const type = "SURVEY" as const;
+  return db.notification.create({
+    data: {
+      organizationId: s.organizationId, appointmentId: s.appointmentId, patientId: s.patient.id, channel: "WHATSAPP", type, recipient: s.patient.whatsapp, templateName: TEMPLATES[type].name, scheduledFor,
+      payload: { bodyVariables: buildVariables(type, { patientFirstName: s.patient.name.split(" ")[0] ?? s.patient.name, establishment: establishmentOf(s.professional.organization, s.professional.displayName) }), buttons: buildButtons(type, { surveyToken: token }) } satisfies WhatsAppPayload,
+    },
+  });
+}
+
+/** Convite de retorno (§28) — template unificado heeca_retorno; texto do convite é configurável pelo profissional. */
+export async function enqueueReactivation(patientId: string, professionalId: string) {
+  const [p, pro] = await Promise.all([
+    db.patient.findUniqueOrThrow({ where: { id: patientId }, select: { id: true, organizationId: true, name: true, whatsapp: true } }),
+    db.professional.findUniqueOrThrow({ where: { id: professionalId }, select: { displayName: true, slug: true, policy: { select: { reactivationInviteText: true } }, organization: { select: { name: true, type: true } } } }),
+  ]);
+  const type = "REACTIVATION" as const;
+  const invite = (pro.policy?.reactivationInviteText?.trim() || DEFAULT_REACTIVATION_TEXT).replace(/\s+/g, " ");
+  return db.notification.create({
+    data: {
+      organizationId: p.organizationId, patientId: p.id, channel: "WHATSAPP", type, recipient: p.whatsapp, templateName: TEMPLATES[type].name,
+      payload: { bodyVariables: buildVariables(type, { patientFirstName: p.name.split(" ")[0] ?? p.name, establishment: establishmentOf(pro.organization, pro.displayName), invite }), buttons: buildButtons(type, { professionalSlug: pro.slug }) } satisfies WhatsAppPayload,
     },
   });
 }

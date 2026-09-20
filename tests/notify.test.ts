@@ -14,6 +14,7 @@ describe("templates × catálogo do Notify", () => {
     heeca_lembrete: { params: 5, buttons: ["quick_reply", "quick_reply"] },
     heeca_cancelado: { params: 4, buttons: ["url"] },
     heeca_remarcado: { params: 4, buttons: [] },
+    heeca_retorno: { params: 3, buttons: ["url"] },
   };
   it("unificados batem em número de parâmetros e tipos de botão", () => {
     for (const [type, spec] of Object.entries(TEMPLATES)) {

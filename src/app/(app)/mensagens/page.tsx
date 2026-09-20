@@ -22,6 +22,8 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   FORM_REQUEST: "Formulário",
   DOCUMENT_REQUEST: "Documento",
   PORTAL_LOGIN: "Acesso ao portal",
+  SURVEY: "Pesquisa de experiência",
+  REACTIVATION: "Convite de retorno",
   PRO_BOOKING_REQUESTED: "Aviso: novo pedido",
   PRO_BOOKING_CONFIRMED: "Aviso: confirmou",
   PRO_BOOKING_CANCELLED: "Aviso: cancelou",

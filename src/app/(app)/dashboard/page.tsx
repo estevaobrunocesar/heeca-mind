@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
+import { pct, workingMinutes } from "@/lib/reports/rules";
 import { STATUS_LABEL, STATUS_TONE } from "@/lib/appointment-status";
 import { addDaysCivil } from "@/lib/availability";
 import { ACTIVE_STATUSES } from "@/lib/availability-data";
@@ -53,7 +54,8 @@ export default async function DashboardPage() {
   const active = { in: [...ACTIVE_STATUSES] };
   const showMoney = actor.activeProfessionalId ? canViewFinancials(actor, actor.activeProfessionalId) : actor.role === "OWNER";
 
-  const [todaySessions, nextSession, patientCount, confirmedUpcoming, pendingCount, monthAppts, rescheduleAudits, receivedMonth] = await Promise.all([
+  const weekEndISO = addDaysCivil(todayISO, 7);
+  const [todaySessions, nextSession, patientCount, confirmedUpcoming, pendingCount, monthAppts, rescheduleAudits, receivedMonth, newPatients, inactivePatients, waitlistCount, weekBooked, weekRules] = await Promise.all([
     db.appointment.findMany({
       where: { ...scope, startsAt: { gte: dayStart, lt: dayEnd }, status: { notIn: ["CANCELLED_BY_PATIENT", "CANCELLED_BY_PROFESSIONAL", "EXPIRED"] } },
       orderBy: { startsAt: "asc" },
@@ -73,9 +75,16 @@ export default async function DashboardPage() {
     }),
     db.auditLog.count({ where: { organizationId: actor.organizationId, action: "appointment.reschedule", createdAt: { gte: monthStart, lt: monthEnd } } }),
     showMoney
-      ? db.payment.aggregate({ where: { appointment: scope, paidAt: { gte: monthStart, lt: monthEnd } }, _sum: { amountCents: true } })
+      ? db.payment.aggregate({ where: { OR: [{ appointment: scope }, { packagePurchase: scope }], paidAt: { gte: monthStart, lt: monthEnd } }, _sum: { amountCents: true } })
       : Promise.resolve({ _sum: { amountCents: 0 } }),
+    db.patient.count({ where: { organizationId: actor.organizationId, deletedAt: null, createdAt: { gte: monthStart, lt: monthEnd } } }),
+    db.patient.count({ where: { organizationId: actor.organizationId, deletedAt: null, followUpStatus: "ACTIVE", OR: [{ lastCompletedAt: { lt: new Date(now.getTime() - 90 * 86_400_000) } }, { lastCompletedAt: null, createdAt: { lt: new Date(now.getTime() - 90 * 86_400_000) } }] } }),
+    db.waitlistEntry.count({ where: { organizationId: actor.organizationId, status: "WAITING", ...(actor.activeProfessionalId ? { professionalId: actor.activeProfessionalId } : {}) } }),
+    db.appointment.aggregate({ where: { ...scope, startsAt: { gte: dayStart, lt: dateTimeInTz(weekEndISO, "00:00", tz) }, status: { in: [...ACTIVE_STATUSES, "COMPLETED"] } }, _sum: { durationMinutes: true } }),
+    db.availabilityRule.findMany({ where: actor.activeProfessionalId ? { professionalId: actor.activeProfessionalId } : { professional: { organizationId: actor.organizationId, isActive: true } }, select: { weekday: true, startTime: true, endTime: true } }),
   ]);
+  const weekCapacity = workingMinutes(weekRules, todayISO, addDaysCivil(weekEndISO, -1));
+  const weekOccupancy = pct(weekBooked._sum.durationMinutes ?? 0, weekCapacity);
 
   // Indicadores do mês
   const completed = monthAppts.filter((a) => a.status === "COMPLETED");
@@ -173,7 +182,10 @@ export default async function DashboardPage() {
               <p className="mt-2 text-sm text-text-muted">Nenhuma sessão agendada.</p>
             )}
           </section>
-          <Stat label="Pacientes ativos" value={patientCount} href="/pacientes?status=ACTIVE" />
+          <Stat label="Pacientes ativos" value={patientCount} hint={`${newPatients} novo(s) no mês`} href="/pacientes?status=ACTIVE" />
+          <Stat label="Inativos há 90+ dias" value={inactivePatients} hint="em acompanhamento, sem sessão recente" href={actor.activeProfessionalId ? `/pacientes/reativacao?professional=${actor.activeProfessionalId}` : "/pacientes"} tone={inactivePatients > 0 ? "warning" : undefined} />
+          <Stat label="Ocupação (7 dias)" value={weekOccupancy === null ? "—" : `${Math.min(100, weekOccupancy)}%`} hint={`${Math.round((weekBooked._sum.durationMinutes ?? 0) / 60)} h de ${Math.round(weekCapacity / 60)} h de grade`} href="/agenda?view=week" />
+          <Stat label="Lista de espera" value={waitlistCount} hint="aguardando horário" href="/agenda/espera" tone={waitlistCount > 0 ? "warning" : undefined} />
           <Stat label="Confirmadas (futuras)" value={confirmedUpcoming} href="/agenda?view=week" />
           <Stat label="Aguardando ação" value={pendingCount} hint="pendentes, aguardando confirmação ou reagendamento" href="/agenda?view=week" tone={pendingCount > 0 ? "warning" : undefined} />
         </aside>

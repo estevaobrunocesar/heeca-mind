@@ -90,6 +90,8 @@ model Organization {
   commissionRules     CommissionRule[]
   commissionEntries   CommissionEntry[]
   commissionClosings  CommissionClosing[]
+  experienceSurveys   ExperienceSurvey[]
+  reactivationContacts ReactivationContact[]
   appointments        Appointment[]
   notifications       Notification[]
   auditLogs           AuditLog[]
@@ -306,6 +308,8 @@ model Professional {
   commissionRules             CommissionRule[]
   commissionEntries           CommissionEntry[]
   commissionClosings          CommissionClosing[]
+  experienceSurveys           ExperienceSurvey[]
+  reactivationContacts        ReactivationContact[]
 
   @@index([organizationId])
   @@map("professionals")
@@ -373,6 +377,12 @@ model ProfessionalPolicy {
   terms              String?
   /// D2: falta (NO_SHOW) consome uma sessão do pacote? Padrão sim — a hora foi reservada.
   noShowConsumesPackage Boolean @default(true)
+  /// §29: enviar pesquisa administrativa de experiência 24 h após a sessão concluída.
+  surveyEnabled Boolean @default(false)
+  /// §28: paciente ativo sem sessão concluída há N dias aparece na lista de reativação.
+  reactivationAfterDays Int @default(90)
+  /// §28: frase do convite ({{3}} do heeca_retorno). Administrativa, configurável; nunca clínica.
+  reactivationInviteText String?
 
   updatedAt DateTime @updatedAt
 
@@ -504,6 +514,8 @@ model Patient {
   documentRequests    DocumentRequest[]
   portalTokens        PatientAccessToken[]
   portalSessions      PatientSession[]
+  experienceSurveys   ExperienceSurvey[]
+  reactivationContacts ReactivationContact[]
 
   @@unique([organizationId, whatsapp])
   @@index([organizationId, name])
@@ -663,6 +675,7 @@ model Appointment {
   packagePurchase   PackagePurchase?   @relation(fields: [packagePurchaseId], references: [id], onDelete: SetNull)
   packageConsumption PackageConsumption?
   documentRequests  DocumentRequest[]
+  experienceSurvey  ExperienceSurvey?
   payments          Payment[]
   notifications     Notification[]
   receipt           Receipt?
@@ -977,6 +990,52 @@ model CommissionClosing {
   @@map("commission_closings")
 }
 
+// ───────────────────────────────────────────────────────────────
+// PESQUISA DE EXPERIÊNCIA (§29) e REATIVAÇÃO (§28) — administrativas
+// ───────────────────────────────────────────────────────────────
+
+/// "Como foi sua experiência com nosso atendimento?" — nota 0–10 e comentário livre. Não é avaliação clínica
+/// nem pública; só o profissional/dono vê. Uma por sessão concluída; uso único do link.
+model ExperienceSurvey {
+  id             String    @id @default(cuid())
+  organizationId String
+  professionalId String
+  patientId      String
+  appointmentId  String    @unique
+  tokenHash      String    @unique
+  score          Int?
+  comment        String?
+  sentAt         DateTime  @default(now())
+  answeredAt     DateTime?
+  expiresAt      DateTime
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, professionalId, answeredAt])
+  @@map("experience_surveys")
+}
+
+/// Convite de retorno enviado por clique humano (nunca automático). Registro para não repetir e medir.
+model ReactivationContact {
+  id             String   @id @default(cuid())
+  organizationId String
+  professionalId String
+  patientId      String
+  notificationId String?
+  sentAt         DateTime @default(now())
+  byUserId       String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, patientId, sentAt])
+  @@map("reactivation_contacts")
+}
+
 model PackageConsumption {
   id                String    @id @default(cuid())
   packagePurchaseId String
@@ -1031,6 +1090,8 @@ enum NotificationType {
   FORM_REQUEST // preencher formulário pré-atendimento
   DOCUMENT_REQUEST // ler e aceitar documento (termo, contrato)
   PORTAL_LOGIN // link mágico de acesso ao portal do paciente
+  SURVEY // pesquisa de experiência após a sessão (§29)
+  REACTIVATION // convite de retorno (§28), por clique humano
   // Avisos ao PROFISSIONAL (canal EMAIL; payload = { subject, text, html })
   PRO_BOOKING_REQUESTED
   PRO_BOOKING_CONFIRMED

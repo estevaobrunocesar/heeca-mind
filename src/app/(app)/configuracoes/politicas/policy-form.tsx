@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Checkbox, FormError, FormSuccess, SubmitButton, TextArea } from "@/components/ui/form";
+import { Checkbox, Field, FormError, FormSuccess, SubmitButton, TextArea } from "@/components/ui/form";
 import type { FormState } from "@/lib/form";
 import { updatePolicyAction } from "../actions";
 
@@ -14,9 +14,12 @@ export type PolicyValues = {
   paymentInfo: string | null;
   terms: string | null;
   noShowConsumesPackage: boolean;
+  surveyEnabled: boolean;
+  reactivationAfterDays: number;
+  reactivationInviteText: string | null;
 };
 
-type TextField = Exclude<keyof PolicyValues, "noShowConsumesPackage">;
+type TextField = Exclude<keyof PolicyValues, "noShowConsumesPackage" | "surveyEnabled" | "reactivationAfterDays" | "reactivationInviteText">;
 
 const FIELDS: Array<{
   name: TextField;
@@ -79,6 +82,13 @@ export function PolicyForm({ policy }: { policy: PolicyValues }) {
           hint="Quando o paciente tem pacote e não comparece, a sessão é descontada do saldo (a hora foi reservada). Desmarque para não descontar."
           defaultChecked={v ? v.noShowConsumesPackage === "on" : policy.noShowConsumesPackage}
         />
+      </div>
+      <div className="space-y-3 rounded-lg border border-border bg-surface-muted/50 p-3">
+        <Checkbox label="Enviar pesquisa de experiência após a sessão" name="surveyEnabled" hint="Nota de 0 a 10 e comentário, 24 h depois de cada sessão concluída. Administrativa e privada — não é avaliação clínica nem pública." defaultChecked={v ? v.surveyEnabled === "on" : policy.surveyEnabled} />
+        <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
+          <Field label="Reativação após (dias)" name="reactivationAfterDays" type="number" inputMode="numeric" hint="Sem sessão há N dias → aparece na lista de reativação." defaultValue={v?.reactivationAfterDays ?? String(policy.reactivationAfterDays)} errors={fe?.reactivationAfterDays} />
+          <Field label="Frase do convite de retorno" name="reactivationInviteText" required={false} placeholder="Faz um tempo desde a sua última sessão. Se quiser retomar, estou por aqui." hint="Vai no meio da mensagem de WhatsApp. Só texto administrativo." defaultValue={v?.reactivationInviteText ?? policy.reactivationInviteText ?? undefined} errors={fe?.reactivationInviteText} />
+        </div>
       </div>
       <div className="flex justify-end">
         <div className="w-40">

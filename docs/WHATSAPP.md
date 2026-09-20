@@ -56,6 +56,7 @@ Fonte da verdade: `src/lib/whatsapp/templates.ts`. Dois grupos:
 | REMINDER_24H | `heeca_lembrete` | cliente, estabelecimento, serviço, "amanhã", hora | Remarcar · Cancelar |
 | CANCELLATION | `heeca_cancelado` | estabelecimento, serviço, data, hora | Agendar novamente (URL → `heeca.com.br/a/mind/<slug>`) |
 | RESCHEDULE | `heeca_remarcado` | estabelecimento, serviço, data, hora | — |
+| REACTIVATION | `heeca_retorno` | cliente, estabelecimento, convite (frase configurável) | Agendar (URL → `heeca.com.br/a/mind/<slug>`) |
 
 "Estabelecimento" = nome da clínica, ou o nome profissional quando é autônomo. "Serviço" leva a modalidade ("Sessão individual (online)") a menos que o nome já a traga. "Orientações" = `Service.patientInstructions` (administrativas), ou `" "` — a Meta não aceita parâmetro vazio.
 
@@ -70,6 +71,7 @@ Fonte da verdade: `src/lib/whatsapp/templates.ts`. Dois grupos:
 | FORM_REQUEST | `heeca_mind_formulario` | URL `/formulario/<token>` |
 | DOCUMENT_REQUEST | `heeca_mind_documento` | URL `/documento/<token>` |
 | PORTAL_LOGIN | `heeca_mind_acesso_portal` | URL `/portal/entrar/<token>` (15 min, uso único) |
+| SURVEY | `heeca_mind_pesquisa` | URL `/pesquisa/<token>` (24 h após a sessão, se ativado) |
 
 Textos de referência de todos estão no `reference` de cada entrada em `templates.ts`. Mudar texto de template aprovado = novo nome.
 

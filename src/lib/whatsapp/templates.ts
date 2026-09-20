@@ -25,7 +25,7 @@ export type WhatsAppNotificationType = Exclude<NotificationType, `PRO_${string}`
 
 export type TemplateButtonSpec =
   | { type: "quick_reply"; intent: "confirm" | "reschedule" | "cancel" }
-  | { type: "url"; suffix: "confirmationToken" | "formToken" | "documentToken" | "portalToken" | "professionalSlug"; label: string };
+  | { type: "url"; suffix: "confirmationToken" | "formToken" | "documentToken" | "portalToken" | "surveyToken" | "professionalSlug"; label: string };
 
 export type TemplateSpec = {
   name: string;
@@ -82,7 +82,21 @@ export const TEMPLATES: Record<WhatsAppNotificationType, TemplateSpec> = {
     reference: "Aviso de {{1}}: seu horário de {{2}} foi remarcado para {{3}} às {{4}}. Qualquer dúvida, responda esta mensagem.",
     variables: ["establishment", "service", "date", "time"],
   },
+  REACTIVATION: {
+    name: "heeca_retorno",
+    unified: true,
+    reference: "Oi, {{1}}! Aqui é {{2}}. {{3}} Quer reservar seu próximo horário? É só tocar no botão.",
+    variables: ["patientFirstName", "establishment", "invite"],
+    buttons: [{ type: "url", suffix: "professionalSlug", label: "Agendar" }],
+  },
   // ── Específicos do Mind (heeca_mind_*; base de URL = NEXT_PUBLIC_APP_URL) ──
+  SURVEY: {
+    name: "heeca_mind_pesquisa",
+    unified: false,
+    reference: "Olá, {{1}}! Como foi sua experiência com o atendimento de {{2}}? Leva menos de um minuto e nos ajuda a melhorar. Toque para responder.",
+    variables: ["patientFirstName", "establishment"],
+    buttons: [{ type: "url", suffix: "surveyToken", label: "Responder" }],
+  },
   REMINDER_2H: {
     name: "heeca_mind_lembrete_2h",
     unified: false,
@@ -138,6 +152,7 @@ export const URL_PATH_BY_SUFFIX: Record<Extract<TemplateButtonSpec, { type: "url
   formToken: "/formulario/",
   documentToken: "/documento/",
   portalToken: "/portal/entrar/",
+  surveyToken: "/pesquisa/",
   professionalSlug: "/agendar/",
 };
 
@@ -163,7 +178,7 @@ export function buildVariables(type: WhatsAppNotificationType, values: Record<st
  */
 export function buildButtons(
   type: WhatsAppNotificationType,
-  ids: { confirmationToken?: string | null; formToken?: string | null; documentToken?: string | null; portalToken?: string | null; professionalSlug?: string | null },
+  ids: { confirmationToken?: string | null; formToken?: string | null; documentToken?: string | null; portalToken?: string | null; surveyToken?: string | null; professionalSlug?: string | null },
 ): TemplateButton[] | undefined {
   const spec = TEMPLATES[type];
   if (!spec.buttons?.length) return undefined;

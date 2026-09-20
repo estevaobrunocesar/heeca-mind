@@ -182,6 +182,9 @@ export const policySchema = z.object({
   paymentInfo: optionalText(1000),
   terms: optionalText(3000),
   noShowConsumesPackage: checkbox, // D2
+  surveyEnabled: checkbox, // §29
+  reactivationAfterDays: z.coerce.number().int().min(14, "Mínimo de 14 dias").max(730, "Máximo de 2 anos"),
+  reactivationInviteText: optionalText(240),
 });
 
 export const retentionSchema = z.object({

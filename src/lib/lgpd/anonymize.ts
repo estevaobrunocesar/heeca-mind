@@ -24,6 +24,7 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
   if (patient.anonymizedAt) return { alreadyDone: true as const };
 
   const appointmentIds = patient.appointments.map((a) => a.id);
+  const purchaseIds = (await db.packagePurchase.findMany({ where: { patientId }, select: { id: true } })).map((p) => p.id);
   const now = new Date();
   // Blobs dos documentos clínicos: apagados do storage DEPOIS da transação
   // (storage não faz rollback). Se a transação falhar, nada foi apagado.
@@ -76,6 +77,12 @@ export async function anonymizePatient(patientId: string, reason: "retention" | 
     await tx.documentRequest.updateMany({ where: { patientId }, data: { acceptName: null, acceptIp: null, acceptUserAgent: null } });
     await tx.documentRequest.updateMany({ where: { patientId, status: { in: ["PENDING", "VIEWED"] } }, data: { status: "REVOKED", revokeReason: "anonimização" } });
     await tx.experienceSurvey.updateMany({ where: { patientId }, data: { comment: null } }); // nota fica (agregado), texto sai
+    // Pacotes: compra, saldo e valores ficam (financeiro); observações e motivos em texto livre saem.
+    await tx.packagePurchase.updateMany({ where: { patientId }, data: { note: null, cancelReason: null } });
+    await tx.packageConsumption.updateMany({ where: { packagePurchase: { patientId } }, data: { revertReason: null } });
+    await tx.documentRequest.updateMany({ where: { patientId, revokeReason: { not: null } }, data: { revokeReason: "—" } }); // já revogados: motivo pode citar a pessoa
+    // Comissões: lançamentos ligados às sessões da pessoa mantêm valor/data; a observação livre sai.
+    await tx.commissionEntry.updateMany({ where: { OR: [{ appointmentId: { in: appointmentIds } }, { packagePurchaseId: { in: purchaseIds } }] }, data: { note: null } });
     await tx.reactivationContact.deleteMany({ where: { patientId } });
     await tx.patientAccessToken.deleteMany({ where: { patientId } });
     await tx.patientSession.deleteMany({ where: { patientId } });

@@ -73,3 +73,19 @@ Proteção do log: `audit_logs` só recebe `INSERT` pela aplicação (sem action
 ## 8. Backup e recuperação
 
 Padrão da plataforma: Postgres diário 03:00 UTC → R2 `heeca-backups`, 7 cópias + 1 local; restore pelo Coolify ou `pg_restore`. **Específico do Mind**: `ENCRYPTION_KEY` fora do backup do banco (está no env do Coolify e em `production.env`) — sem ela o backup do prontuário é inútil; registrar no `docs/DEPLOY.md` §"perda de chave" e testar restore + leitura de uma nota cifrada a cada rotação de chave.
+
+## 9. Revisão pós-implementação (20/09/2026)
+
+Escopo: `permissions.ts` e `lgpd/anonymize.ts` contra os módulos novos (pacotes, documentos, portal, comissões, relatórios/reativação); cabeçalhos e limites das rotas públicas `/documento`, `/portal`, `/pesquisa` (e, de tabela, `/agendar`, `/confirmar`, `/formulario`).
+
+| Item | Resultado | Ação |
+|---|---|---|
+| Autorização por papel nos módulos novos | Coerente: FINANCE fora de agenda/pacientes/documentos/reativação; recepção fora de valores e comissões; comissões só OWNER/FINANCE (gerir) e o próprio profissional (ver). `permissions.test.ts` cobre FINANCE e comissões. | — |
+| Cerca de tenant dentro dos serviços | Todos os serviços resolvem entidades com `organizationId: actor.organizationId`. **Achado**: `reports.listReactivation/sendReactivation` recebiam `professionalId` do cliente e, para OWNER, `canManageSchedule` passa para qualquer id — o paciente era checado no tenant, o profissional não (gravaria `ReactivationContact` apontando para profissional de outra org e exporia o texto de convite dele). | Corrigido (`professionalInTenant`); `check:tenant` ganhou o caso "profissional de A + paciente de B" e passa a contar de verdade (19 tentativas). |
+| Anonimização (D6/LGPD) | Cobria tokens/sessões do portal, aceite do documento, comentário da pesquisa, reativação. **Achado**: texto livre de `PackagePurchase.note/cancelReason`, `PackageConsumption.revertReason`, `DocumentRequest.revokeReason` e `CommissionEntry.note` ficava. | Corrigido; `check:lgpd` confere pacote e comissão (valor/status ficam, texto sai). |
+| Cabeçalhos nas rotas públicas | Todas devolvem `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, HSTS e `Cache-Control: private, no-cache, no-store` (dinâmicas). Token só na URL path; cross-origin só vaza a origem. | — |
+| Rate limit | `/documento` (aceite), `/pesquisa` (resposta), `/portal/entrar` (troca de token) e `/confirmar`/`/formulario`: `tokenActionIp` 30/10 min. Pedido de link do portal: `portalPhone` 3/h + `portalIp` 20/h. Agendamento público: IP 10/10 min, telefone 3/h, profissional 60/h. GET das páginas por token não é limitado (tokens de 32 bytes; lookup por hash). | — |
+| Cookie do portal | `hm_patient`: httpOnly, `SameSite=Lax`, `Secure` em produção, `Path=/portal`, TTL da sessão; sessões revogáveis pela ficha. | — |
+| Uploads (foto, logo) | Só OWNER (logo) / dono do perfil (foto); sniff de magic bytes no servidor; 1,5 MB; chave nova a cada upload e exclusão da anterior; auditado. **Achado (E2E em build de produção)**: com `STORAGE_DRIVER=local`, o Next só serve `public/` do que existia no build — todo upload pós-deploy dava 404. | `src/app/uploads/[...key]/route.ts` serve em runtime (só imagens por magic bytes, sem `..`, cache imutável). `07-clinica` confere o GET. |
+
+Dívidas que ficam (não bloqueiam): CSP com nonce (Next exige ajuste nos scripts inline); `Referrer-Policy: no-referrer` específico nas rotas por token, se algum dia houver link externo nelas.

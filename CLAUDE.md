@@ -184,6 +184,8 @@ prisma/                schema, migrations, seed
 
 ## Storage de arquivos
 
+- Driver `local` grava em `public/uploads/`, mas em produção o Next só serve `public/` do que existia no build: `src/app/uploads/[...key]/route.ts` serve os uploads em runtime (só imagens). Não remover essa rota ao mexer no storage.
+
 - `src/lib/storage/`: interface `StorageProvider`, drivers `local` (public/uploads, dev e VPS) e `s3` (SigV4 manual, testado contra o vetor da AWS; funciona com S3/R2/MinIO). `STORAGE_DRIVER` escolhe.
 - Toda chave leva o prefixo `mind/` (`KEY_PREFIX`). Em produção o bucket é exclusivo do produto (`heeca-mind`, regra "cada produto é individual" da plataforma).
 - Foto de perfil: recorte quadrado + resize 512px no navegador (canvas, sem `sharp`); servidor valida magic bytes (`src/lib/image.ts`) e 1,5 MB. SVG é recusado (pode carregar script). Chave com timestamp → cache imutável; a anterior é apagada em melhor esforço. `Professional.photoKey` guarda a chave para exclusão.

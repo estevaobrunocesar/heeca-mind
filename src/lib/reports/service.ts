@@ -52,7 +52,13 @@ export async function surveyResults(actor: Actor, professionalId: string, range:
 
 // ── Reativação ──────────────────────────────────────────────────────────────
 
+/** Profissional precisa ser do tenant: `canManageSchedule` é por papel e o id vem do cliente. */
+async function professionalInTenant(actor: Actor, professionalId: string) {
+  return db.professional.findFirst({ where: { id: professionalId, organizationId: actor.organizationId }, select: { id: true } });
+}
+
 export async function listReactivation(actor: Actor, professionalId: string, now = new Date()) {
+  if (!(await professionalInTenant(actor, professionalId))) return { afterDays: 90, inviteText: null, candidates: [] };
   const policy = await db.professionalPolicy.findUnique({ where: { professionalId }, select: { reactivationAfterDays: true, reactivationInviteText: true } });
   const afterDays = policy?.reactivationAfterDays ?? 90;
   const rows = await db.patient.findMany({
@@ -70,6 +76,7 @@ export async function listReactivation(actor: Actor, professionalId: string, now
 /** Envia o convite de retorno (heeca_retorno) — sempre por clique humano. */
 export async function sendReactivation(actor: Actor, professionalId: string, patientId: string): Promise<void> {
   if (!canManageSchedule(actor, professionalId)) throw new Error("Sem permissão");
+  if (!(await professionalInTenant(actor, professionalId))) throw new Error("Profissional não encontrado");
   const patient = await db.patient.findFirst({ where: { id: patientId, organizationId: actor.organizationId, deletedAt: null }, select: { id: true } });
   if (!patient) throw new Error("Paciente não encontrado");
   const n = await enqueueReactivation(patient.id, professionalId);

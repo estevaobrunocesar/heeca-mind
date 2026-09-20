@@ -26,7 +26,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "npm run build && npm run start",
+    // .next/dev (tipos gerados pelo dev server) entra no type-check do build e, estale, derruba a suíte.
+    command: "node -e \"require('fs').rmSync('.next/dev',{recursive:true,force:true})\" && npm run build && npm run start",
     env: { E2E: "1" },
     url: "http://localhost:3000/api/health",
     reuseExistingServer: !!process.env.PW_REUSE,

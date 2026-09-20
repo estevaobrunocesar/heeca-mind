@@ -50,9 +50,10 @@ async function main() {
   const B = await makeOrg("B");
   const actorB: Actor = { userId: "u-b", organizationId: B.orgId, role: "OWNER", professionalId: B.proId, activeProfessionalId: B.proId };
   const failures: string[] = [];
-  const expectEmpty = (label: string, v: unknown[]) => { if (v.length !== 0) failures.push(`${label}: devolveu ${v.length} item(ns) de A para B`); };
-  const expectNull = (label: string, v: unknown) => { if (v !== null && v !== undefined) failures.push(`${label}: devolveu registro de A para B`); };
-  const expectThrow = async (label: string, fn: () => Promise<unknown>) => { try { await fn(); failures.push(`${label}: não lançou`); } catch { /* esperado */ } };
+  let attempts = 0;
+  const expectEmpty = (label: string, v: unknown[]) => { attempts++; if (v.length !== 0) failures.push(`${label}: devolveu ${v.length} item(ns) de A para B`); };
+  const expectNull = (label: string, v: unknown) => { attempts++; if (v !== null && v !== undefined) failures.push(`${label}: devolveu registro de A para B`); };
+  const expectThrow = async (label: string, fn: () => Promise<unknown>) => { attempts++; try { await fn(); failures.push(`${label}: não lançou`); } catch { /* esperado */ } };
 
   try {
     expectEmpty("packages.listPurchasesForPatient", await packages.listPurchasesForPatient(actorB, A.patientId));
@@ -77,6 +78,9 @@ async function main() {
     const r = await reports.listReactivation(actorB, A.proId);
     expectEmpty("reports.listReactivation", r.candidates);
     await expectThrow("reports.sendReactivation", () => reports.sendReactivation(actorB, A.proId, A.patientId));
+    // O caso que a cerca do paciente não pega: paciente de B, profissional de A (OWNER passa em canManageSchedule).
+    await expectThrow("reports.sendReactivation (pro de A, paciente de B)", () => reports.sendReactivation(actorB, A.proId, B.patientId));
+    expectNull("reports.listReactivation.inviteText (pro de A)", (await reports.listReactivation(actorB, A.proId)).inviteText);
     expectEmpty("reports.surveyResults", await reports.surveyResults(actorB, A.proId, { from: new Date("2020-01-01"), to: new Date("2030-01-01") }));
 
     // Portal: sessão de A não vale na organização B (o slug de B dá o tenant).
@@ -93,7 +97,7 @@ async function main() {
     console.error("FALHOU:\n - " + failures.join("\n - "));
     process.exit(1);
   }
-  console.log("ok: 16 tentativas cruzadas entre tenants bloqueadas");
+  console.log(`ok: ${attempts} tentativas cruzadas entre tenants bloqueadas`);
 }
 
 main()

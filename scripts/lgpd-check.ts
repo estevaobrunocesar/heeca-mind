@@ -72,6 +72,14 @@ async function main() {
   });
   await db.auditLog.create({ data: { organizationId: org.id, action: "patient.update", entityType: "Patient", entityId: patient.id, before: { name: "Fulana" }, after: { name: "Fulana de Tal" } } });
 
+  // Módulos do Mind: pacote com observação + consumo revertido com motivo; comissão com observação.
+  const pkg = await db.package.create({ data: { organizationId: org.id, professionalId: pro.id, name: "LGPD 4", sessionsCount: 4, priceCents: 80000, validityDays: 90 } });
+  const purchase = await db.packagePurchase.create({
+    data: { organizationId: org.id, patientId: patient.id, packageId: pkg.id, professionalId: pro.id, nameSnapshot: "LGPD 4", sessionsTotal: 4, priceCents: 80000, expiresAt: sixYearsAgo, status: "CANCELLED", cancelledAt: sixYearsAgo, cancelReason: "Fulana mudou de cidade", note: "pagou em 2x, pediu recibo",
+      consumptions: { create: { appointmentId: appt.id, reason: "completed", revertedAt: sixYearsAgo, revertReason: "Fulana contestou" } } },
+  });
+  const entry = await db.commissionEntry.create({ data: { organizationId: org.id, professionalId: pro.id, kind: "ADJUSTMENT", appointmentId: appt.id, baseCents: 0, amountCents: 5000, occurredAt: sixYearsAgo, note: "ajuste sessão da Fulana" } });
+
   // Paciente "recente": excluído ontem — NÃO deve ser anonimizado.
   const recent = await db.patient.create({ data: { organizationId: org.id, name: "Recente", whatsapp: "+5511900000098", deletedAt: new Date(Date.now() - 86400_000) } });
 
@@ -86,6 +94,8 @@ async function main() {
   const n = await db.notification.findFirstOrThrow({ where: { patientId: patient.id } });
   const logs = await db.auditLog.findMany({ where: { entityType: "Patient", entityId: patient.id }, orderBy: { createdAt: "asc" } });
   const r = await db.patient.findUniqueOrThrow({ where: { id: recent.id } });
+  const pp = await db.packagePurchase.findUniqueOrThrow({ where: { id: purchase.id }, include: { consumptions: true } });
+  const ce = await db.commissionEntry.findUniqueOrThrow({ where: { id: entry.id } });
 
   const checks: Array<[string, boolean]> = [
     ["antigo anonimizado", p.anonymizedAt !== null],
@@ -97,12 +107,16 @@ async function main() {
     ["documentos clínicos apagados (linha e blob)", docs === 0 && blob === null],
     ["notificação sem destinatário/payload", n.recipient === "anonimizado" && JSON.stringify(n.payload) === "{}"],
     ["auditoria antiga sem before/after, rastro mantido", logs[0].before === null && logs[0].after === null && logs.some((l) => l.action === "patient.anonymize")],
+    ["pacote mantido (valor/status), textos removidos", pp.priceCents === 80000 && pp.status === "CANCELLED" && pp.note === null && pp.cancelReason === null && pp.consumptions[0]?.revertReason === null],
+    ["comissão mantida sem observação", ce.amountCents === 5000 && ce.note === null],
     ["recente intocado", r.anonymizedAt === null && r.name === "Recente"],
     ["idempotente", (await anonymizeExpiredPatients()).anonymized === 0],
   ];
   for (const [label, ok] of checks) console.log(ok ? "✔" : "✖", label);
 
   await db.patient.deleteMany({ where: { id: { in: [patient.id, recent.id] } } });
+  await db.commissionEntry.deleteMany({ where: { id: entry.id } }).catch(() => {});
+  await db.package.deleteMany({ where: { id: pkg.id } });
   await storage.deletePrivate(docKey).catch(() => {}); // se o job não rodou, o blob de teste não pode ficar
   if (checks.some(([, ok]) => !ok)) process.exit(1);
 }

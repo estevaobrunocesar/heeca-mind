@@ -45,8 +45,14 @@ test("link mágico, reagendamento dentro da política, cancelamento negado fora 
   const otherDay = page.locator('a[href*="reagendar?date="]').nth(1);
   await expect(otherDay).toBeVisible();
   await otherDay.click();
-  await page.getByRole("button", { name: /^\d{2}:\d{2}$/ }).first().click();
-  await page.getByRole("button", { name: /^Confirmar \d{2}:\d{2}$/ }).click();
+  await expect(page).toHaveURL(/reagendar\?date=/);
+  await page.waitForLoadState("networkidle"); // PickSlot é client component: clique antes da hidratação não seleciona
+  const slot = page.getByRole("button", { name: /^\d{2}:\d{2}$/ }).first();
+  await expect(slot).toBeVisible();
+  await slot.click();
+  const confirm = page.getByRole("button", { name: /^Confirmar \d{2}:\d{2}$/ });
+  if (!(await confirm.isVisible().catch(() => false))) await slot.click(); // segunda chance se o 1º clique caiu pré-hidratação
+  await confirm.click();
   await expect(page).toHaveURL(/rescheduled=1/);
   const moved = await db.appointment.findUniqueOrThrow({ where: { id: farId }, select: { startsAt: true, status: true } });
   expect(moved.startsAt.getTime()).not.toBe(atHour(7, 14).getTime());

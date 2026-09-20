@@ -99,6 +99,7 @@ Resumo — detalhes e textos dos templates em `docs/WHATSAPP.md`:
 - [ ] Cadastro, login, MFA e "sair dos outros dispositivos" funcionam
 - [ ] Um agendamento público de teste chega em **Agenda** como "Aguardando confirmação" e a mensagem aparece em **Mensagens**
 - [ ] `/api/cron` responde 200 com o `CRON_SECRET` e 401 sem
+- [ ] E-mail real chega: `SMTP_CHECK_TO=voce@… npx tsx --conditions=react-server scripts/smtp-check.ts` (e "Esqueci minha senha" entrega o link)
 - [ ] Backup do banco agendado; `ENCRYPTION_KEY` e `AUTH_SECRET` guardados em cofre
 - [ ] Política de privacidade e termos publicados (o formulário público cita o consentimento LGPD)
 - [ ] Retenção de dados definida em **Políticas** (padrão 5 anos)

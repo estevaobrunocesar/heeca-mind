@@ -1,88 +1,141 @@
 @import "tailwindcss";
 
 /*
- * Tokens de design — Heeca Mind, layout "clean" da plataforma (../ui/layout.md, "Mapa por app").
- *
- * Papéis que não se misturam:
- *  --primary  = ACENTO do produto (filete do header, títulos, links, item ativo, chip selecionado).
- *               Sálvia provisória até o kit de marca definir a cor do Mind (docs/mind, decisão D7).
- *  --action   = botão primário QUASE-PRETO — nunca a cor do produto.
- *  --success / --warning / --danger carregam significado; a cor do produto nunca.
+ * Padrão de painel Heeca (../docs/PADRAO-PAINEL.md): tela clara (#f5f5f7), cartões brancos de cantos 14px sem
+ * sombra, Inter, ícones em pastilhas coloridas e UMA cor de ação — o acento da família saúde (laranja #f06511,
+ * `brand/products.csv`). Os nomes antigos do Mind (bg, surface, border, text, primary, action…) continuam válidos e apontam
+ * para os tokens do padrão, para as telas existentes seguirem funcionando; código novo usa brand-N, canvas, ink, mut e line.
  */
-:root {
-  --bg: #ffffff;
-  --surface: #ffffff;
-  --surface-muted: #f7f7f8;
-  --border: #e3e3e6;
-  --text: #0a0a0a;
-  --text-muted: #6a6a6a;
-  --primary: #5f7a6a;
-  --primary-hover: #4d6558;
-  --primary-soft: #e6ede8;
-  --action: #0a0a0a;
-  --action-hover: #2e2e2e;
-  --accent: #c98b5b;
-  --danger: #b8503f;
-  --danger-soft: #f7e6e2;
-  --success: #4f7d5b;
-  --warning: #b78a2f;
-  --radius: 6px;
-}
-
-@theme inline {
-  --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface-muted: var(--surface-muted);
-  --color-border: var(--border);
-  --color-text: var(--text);
-  --color-text-muted: var(--text-muted);
-  --color-primary: var(--primary);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-soft: var(--primary-soft);
-  --color-action: var(--action);
-  --color-action-hover: var(--action-hover);
-  --color-accent: var(--accent);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --radius-card: var(--radius);
+
+  --color-brand-50: #fff4ec;
+  --color-brand-100: #ffe6d3;
+  --color-brand-200: #ffc9a3;
+  --color-brand-300: #ffa66b;
+  --color-brand-400: #fb833a;
+  --color-brand-500: #f56f1c;
+  --color-brand-600: #f06511;
+  --color-brand-700: #c84f0c;
+  --color-brand-800: #a1400c;
+  --color-brand-900: #83370f;
+  --color-brand-950: #471905;
+
+  /* Neutros do painel */
+  --color-canvas: #f5f5f7;
+  --color-ink: #111114;
+  --color-ink-2: #3f3f46;
+  --color-mut: #71717a;
+  --color-mut-2: #a1a1aa;
+  --color-line: #ebebef;
+  --color-line-2: #f0f0f3;
+
+  /* Aliases do Move (telas existentes) */
+  --color-bg: #f5f5f7;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f5f7;
+  --color-border: #ebebef;
+  --color-text: #111114;
+  --color-text-muted: #71717a;
+  --color-primary: #f06511;
+  --color-primary-hover: #c84f0c;
+  --color-primary-soft: #fff4ec;
+  --color-action: #f06511;
+  --color-action-hover: #c84f0c;
+  --color-accent: #f06511;
+  --color-danger: #e11d48;
+  --color-danger-soft: #fff1f2;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+
+  --radius-card: 14px;
+  --radius-ctl: 10px;
 }
 
-html {
+:root {
+  --radius: 14px;
   color-scheme: light;
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
+  @apply bg-canvas text-ink antialiased;
 }
 
-/* Componentes utilitários compartilhados */
-@layer components {
-  .input {
-    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text
-      placeholder:text-text-muted/70 outline-none transition
-      focus:border-primary focus:ring-2 focus:ring-primary/20;
-  }
-  .label {
-    @apply mb-1 block text-sm font-medium text-text;
-  }
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
-      disabled:cursor-not-allowed disabled:opacity-60 bg-action text-white hover:bg-action-hover;
-  }
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
-      disabled:cursor-not-allowed disabled:opacity-60 border border-border bg-surface text-text hover:bg-surface-muted;
-  }
-  .card {
-    @apply rounded-[var(--radius)] border border-border bg-surface p-6; /* sem sombra (layout.md) */
-  }
-  .field-error {
-    @apply mt-1 text-xs text-danger;
-  }
+/* ───── Componentes base (Tailwind v4: @utility permite reuso via @apply) ───── */
+
+@utility input {
+  @apply w-full rounded-[10px] border border-line bg-white px-3 py-2.5 text-sm text-ink
+    placeholder:text-mut-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100
+    disabled:cursor-not-allowed disabled:bg-zinc-100;
+}
+
+@utility label {
+  @apply mb-1 block text-[12.5px] font-medium text-ink-2;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-[13px] font-semibold transition
+    focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* Ação principal = acento da família (no painel a cor de ação é a do produto) */
+@utility btn-primary {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+}
+
+@utility btn-accent {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+}
+
+@utility btn-secondary {
+  @apply btn border border-line bg-white text-ink hover:bg-zinc-50;
+}
+
+/* No Mind o "ghost" sempre foi o botão secundário com borda */
+@utility btn-ghost {
+  @apply btn border border-line bg-white text-ink hover:bg-zinc-50;
+}
+
+@utility btn-danger {
+  @apply btn border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100;
+}
+
+/* Cartão: as telas do Mind usam `card` já com padding (p-5); o painel inicial sobrescreve com p-4 */
+@utility card {
+  @apply rounded-[14px] border border-line bg-white p-5;
+}
+
+/* Cabeçalho de cartão: título à esquerda, ação/link à direita */
+@utility card-hd {
+  @apply mb-3 flex items-center justify-between gap-3;
+}
+
+@utility card-title {
+  @apply text-[13.5px] font-semibold text-ink;
+}
+
+/* Pastilha de ícone (KPI, ação rápida, item de lista) */
+@utility tile {
+  @apply grid size-9 shrink-0 place-items-center rounded-[10px];
+}
+
+/* Etiquetas de status */
+@utility tag {
+  @apply inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold;
+}
+@utility tag-ok { @apply tag bg-emerald-50 text-emerald-700; }
+@utility tag-warn { @apply tag bg-amber-50 text-amber-700; }
+@utility tag-info { @apply tag bg-sky-50 text-sky-700; }
+@utility tag-bad { @apply tag bg-rose-50 text-rose-700; }
+@utility tag-mut { @apply tag bg-zinc-100 text-zinc-600; }
+@utility tag-acc { @apply tag bg-brand-50 text-brand-700; }
+
+/* Link discreto de "ver tudo" */
+@utility link-mut {
+  @apply text-xs font-medium text-mut hover:text-ink;
+}
+
+@utility field-error {
+  @apply mt-1 text-xs text-rose-600;
 }

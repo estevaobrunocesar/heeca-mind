@@ -31,7 +31,7 @@ export default async function ClinicPage({ params }: PageProps<"/clinica/[slug]"
   if (!org) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 py-8">
+    <main className="mx-auto w-full max-w-lg bg-white px-5 py-8 sm:my-6 sm:rounded-[20px] sm:border sm:border-line">
       <header className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight">{org.name}</h1>
         <p className="mt-1 text-sm text-text-muted">Escolha o(a) profissional para ver horários e agendar.</p>
@@ -42,7 +42,7 @@ export default async function ClinicPage({ params }: PageProps<"/clinica/[slug]"
           const mod = modalities.has("HYBRID") || (modalities.has("ONLINE") && modalities.has("IN_PERSON")) ? "Presencial e online" : modalities.has("ONLINE") ? "Online" : modalities.size ? "Presencial" : null;
           return (
             <li key={p.slug}>
-              <Link href={`/agendar/${p.slug}`} className="card flex items-center gap-4 p-4 transition hover:border-primary/50 hover:shadow-sm">
+              <Link href={`/agendar/${p.slug}`} className="card flex items-center gap-4 p-4 transition hover:border-primary/50">
                 {p.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={p.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />

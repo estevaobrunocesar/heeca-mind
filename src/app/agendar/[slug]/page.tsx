@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatRegistration } from "@/lib/registration";
+import { HeecaAppIcon } from "@/components/brand/logo";
 
 /**
  * Página pública do profissional. Mobile-first, sem autenticação.
@@ -60,7 +61,7 @@ export default async function PublicBookingPage({ params }: PageProps<"/agendar/
   const location = [p.addressCity, p.addressState].filter(Boolean).join(" · ");
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 py-8">
+    <main className="mx-auto w-full max-w-lg bg-white px-5 py-8 sm:my-6 sm:rounded-[20px] sm:border sm:border-line">
       <header className="flex flex-col items-center text-center">
         {p.organization.type === "CLINIC" && p.organization.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -99,7 +100,7 @@ export default async function PublicBookingPage({ params }: PageProps<"/agendar/
           <ul className="space-y-3">
             {p.services.map((s) => (
               <li key={s.id}>
-                <Link href={`/agendar/${slug}/${s.id}`} className="card block p-4 transition hover:border-primary/50 hover:shadow-sm">
+                <Link href={`/agendar/${slug}/${s.id}`} className="card block p-4 transition hover:border-primary/50">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-medium">{s.name}</p>
@@ -153,6 +154,10 @@ export default async function PublicBookingPage({ params }: PageProps<"/agendar/
           Acesse seu portal
         </Link>
       </p>
+      <footer className="mt-8 flex items-center justify-center gap-2 text-xs text-zinc-400">
+        <HeecaAppIcon product="mind" size={20} radius={5} />
+        Agendamento online por <span className="font-medium text-zinc-500">Heeca Mind</span>
+      </footer>
     </main>
   );
 }

@@ -9,6 +9,7 @@ import { canManageMembers } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { getStorage } from "@/lib/storage";
 import { organizationSchema } from "@/lib/validation/organization";
+import { parseBRLToCents } from "@/lib/money";
 
 /** Cadastro da clínica (§6). Só OWNER — mesma regra da equipe. */
 export async function updateOrganizationAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -73,4 +74,17 @@ export async function removeClinicLogoAction(): Promise<void> {
   await audit(actor, { organizationId: orgId, action: "organization.logo_remove", entityType: "Organization", entityId: orgId, before: { logoUrl: before.logoUrl } });
   revalidatePath("/configuracoes/clinica");
   revalidatePath("/", "layout");
+}
+
+// Meta de recebimento do mês (anel do painel inicial, padrão de painel Heeca)
+export async function updateGoalAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireActor();
+  if (!canManageMembers(actor)) return { error: "Só o responsável pela conta define a meta." };
+  const raw = String(formData.get("metaMensal") ?? "").trim();
+  const cents = raw ? parseBRLToCents(raw) : null;
+  if (raw && (cents === null || cents < 0)) return { fieldErrors: { metaMensal: ["Informe um valor em reais, ex.: 12.000,00"] }, values: { metaMensal: raw } };
+  await db.organization.update({ where: { id: actor.organizationId }, data: { metaMensalCents: cents } });
+  revalidatePath("/dashboard");
+  revalidatePath("/configuracoes/clinica");
+  return { ok: true };
 }

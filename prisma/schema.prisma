@@ -57,6 +57,7 @@ model Organization {
   planFeatures        String[]    @default([])
   planLimits          Json?
   accessState         AccessState @default(OK)
+  metaMensalCents     Int? // meta de faturamento do mês (anel no painel inicial); null = sem meta
   entitlementSyncedAt DateTime?
   // Dados da conta vindos do portal (cadastro completo da clínica entra na etapa 2)
   document            String? // CPF/CNPJ só dígitos

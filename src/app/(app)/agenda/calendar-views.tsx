@@ -48,7 +48,7 @@ export function AppointmentChip({ a, tz, compact = false }: { a: CalendarAppoint
   return (
     <Link
       href={`/agenda/${a.id}`}
-      className={`block overflow-hidden rounded-md border px-2 py-1 text-xs leading-tight transition hover:shadow-sm ${tone}`}
+      className={`block overflow-hidden rounded-md border px-2 py-1 text-xs leading-tight transition ${tone}`}
       title={`${a.patient.name} · ${a.serviceNameSnapshot} · ${STATUS_LABEL[a.status]}`}
     >
       <span className="font-medium">

@@ -7,13 +7,18 @@ import { defineConfig } from "@playwright/test";
  *
  *   npm run e2e             # build + start + testes
  *   PW_REUSE=1 npm run e2e  # reaproveita um `npm run start` já de pé
- *   E2E_PORT=3500 npm run e2e
+ *   E2E_PORT=3530 npm run e2e
  *
- * Porta: o Windows (Hyper-V/WSL) reserva faixas dinâmicas a cada reinício e a 3000 pode cair
- * dentro de uma delas — o sintoma é `listen EACCES` no build, não um teste vermelho. Confira com
- * `netsh interface ipv4 show excludedportrange protocol=tcp` e use E2E_PORT numa porta de fora.
+ * Porta 3521, não 3000: (a) o Windows (Hyper-V/WSL) reserva faixas dinâmicas a cada reinício e a
+ * 3000 pode cair dentro de uma delas — o sintoma é `listen EACCES` no build, não um teste vermelho
+ * (`netsh interface ipv4 show excludedportrange protocol=tcp` lista as faixas); (b) esta máquina
+ * roda várias sessões de produtos Heeca ao mesmo tempo, e portas redondas colidem — já aconteceu de
+ * a suíte do Mind dirigir o app do Nutri e escrever no banco dele. Uma porta por produto.
+ *
+ * Por isso o global-setup confere a identidade do servidor antes de rodar: com PW_REUSE, responder
+ * 200 em /api/health não prova que é ESTE app.
  */
-const PORT = process.env.E2E_PORT ?? "3000";
+const PORT = process.env.E2E_PORT ?? "3521";
 const BASE = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({

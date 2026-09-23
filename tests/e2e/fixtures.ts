@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { hashSync } from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import type { Page } from "@playwright/test";
@@ -43,9 +43,27 @@ export async function cleanupAll() {
   await db.rateLimit.deleteMany({});
 }
 
+/**
+ * Zera SÓ os contadores de login antes de entrar.
+ *
+ * `clientIp()` cai para "unknown" quando não há x-forwarded-for, então TODO login da suíte
+ * cai no mesmo balde `login:ip` (20 por 15 min): com a suíte crescendo, as últimas specs
+ * começam a falhar por limite acumulado das anteriores — esperando /dashboard, sem nada a ver
+ * com o cenário que testam. Apagar a tabela inteira resolveria, mas levaria junto os limites
+ * de agendamento público, portal e tokens, que os testes precisam ver funcionando de verdade.
+ * As chaves são sha256(`${scope}:${identifier}`) — dá para remover exatamente as duas.
+ */
+async function clearLoginThrottle(email: string) {
+  const key = (scope: string, id: string) => createHash("sha256").update(`${scope}:${id}`).digest("hex");
+  await db.rateLimit.deleteMany({
+    where: { key: { in: [key("login:email", email), key("login:ip", "unknown"), key("login:ip", "127.0.0.1")] } },
+  });
+}
+
 export async function login(page: Page, email: string) {
-  // Sem limpar os cookies, trocar de usuário no meio do teste pode manter a sessão anterior
-  // (quem já está autenticado não recebe o formulário de /login) e o teste segue com o ator errado.
+  await clearLoginThrottle(email);
+  // Trocar de usuário no meio do teste sem limpar os cookies pode deixar a sessão anterior de pé
+  // e o teste segue com o ator errado — um teste de permissão passa sem exercitar o papel restrito.
   await page.context().clearCookies();
   await page.goto("/login");
   await page.getByLabel("E-mail").fill(email);

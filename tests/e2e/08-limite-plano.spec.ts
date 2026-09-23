@@ -29,8 +29,11 @@ test("plano Solo recusa o convite; desativar libera a vaga; sem limite não barr
   await page.getByLabel("E-mail").fill("e2e-sem-vaga@teste.local");
   await page.getByLabel("Papel", { exact: true }).selectOption("PROFESSIONAL");
   await page.getByRole("button", { name: "Convidar" }).click();
-  // getByRole("alert") casaria também com o anunciador de rota do Next: vamos pelo texto.
-  await expect(page.getByText(/Seu plano inclui 1 profissional\..*desative.*mude de plano/s)).toBeVisible();
+  // A recusa aparece no formulário; o contador acima repete a instrução — daí escopar no form
+  // (getByRole("alert") também casaria com o anunciador de rota do Next).
+  const inviteForm = page.locator("form").filter({ has: page.getByRole("button", { name: "Convidar" }) });
+  await expect(inviteForm.getByText(/Seu plano inclui 1 profissional\./)).toBeVisible();
+  await expect(inviteForm.getByText(/remova um profissional da equipe[\s\S]*mude de plano/)).toBeVisible();
   expect(await db.invitation.count({ where: { organizationId: t.orgId, email: "e2e-sem-vaga@teste.local" } })).toBe(0);
 
   // Recepção não ocupa vaga de profissional: o mesmo plano aceita.

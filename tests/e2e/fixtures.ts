@@ -44,6 +44,9 @@ export async function cleanupAll() {
 }
 
 export async function login(page: Page, email: string) {
+  // Sem limpar os cookies, trocar de usuário no meio do teste pode manter a sessão anterior
+  // (quem já está autenticado não recebe o formulário de /login) e o teste segue com o ator errado.
+  await page.context().clearCookies();
   await page.goto("/login");
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha").fill(PASSWORD);

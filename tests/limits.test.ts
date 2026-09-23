@@ -48,6 +48,7 @@ describe("seatsFullMessage", () => {
   it("diz o que fazer e concorda no singular", () => {
     assert.match(seatsFullMessage(1), /1 profissional\./);
     assert.match(seatsFullMessage(3), /3 profissionais\./);
-    assert.match(seatsFullMessage(1), /desative|mude de plano/i);
+    assert.match(seatsFullMessage(1), /remova um profissional da equipe/i);
+    assert.match(seatsFullMessage(1), /mude de plano/i);
   });
 });

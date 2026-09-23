@@ -25,8 +25,14 @@ export function canAddProfessional(max: number | null | undefined, activeCount: 
   return typeof max !== "number" || activeCount < max;
 }
 
-/** Mensagem de recusa: diz o que fazer, não só que não pode. */
+/**
+ * Mensagem de recusa: diz o que fazer, não só que não pode.
+ *
+ * "Remover da equipe" é o texto do botão real (removeMemberAction) — que é também o único
+ * caminho no Mind que libera uma vaga, porque desliga o perfil. Não prometa "desativar":
+ * não existe essa ação na tela.
+ */
 export function seatsFullMessage(max: number): string {
   const vagas = max === 1 ? "1 profissional" : `${max} profissionais`;
-  return `Seu plano inclui ${vagas}. Para incluir mais alguém, desative um profissional em Configurações › Equipe ou mude de plano na sua conta Heeca.`;
+  return `Seu plano inclui ${vagas}. Para incluir mais alguém, remova um profissional da equipe em Configurações › Equipe ou mude de plano na sua conta Heeca.`;
 }

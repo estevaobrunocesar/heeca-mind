@@ -39,7 +39,7 @@ export default async function TeamPage() {
       {seats.max !== null && (
         <p className="text-sm text-text-muted">
           Profissionais: <strong className="text-text">{seats.active}</strong> de {seats.max} do seu plano.
-          {seats.active >= seats.max && " Para incluir mais alguém, desative um profissional ou mude de plano na sua conta Heeca."}
+          {seats.active >= seats.max && " Para incluir mais alguém, remova um profissional da equipe ou mude de plano na sua conta Heeca."}
         </p>
       )}
       <InviteForm />

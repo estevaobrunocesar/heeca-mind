@@ -24,7 +24,9 @@ test.describe("onboarding via portal", () => {
     const sso = portal.ssoUrl(sub, email);
     await page.goto(sso);
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByRole("heading", { name: "Início" })).toBeVisible();
+    // O painel saúda pelo primeiro nome ("Bom dia, Fulano! 👋"); "Início" ficou só no <title>.
+    await expect(page.getByRole("heading", { name: /^(Bom dia|Boa tarde|Boa noite), / })).toBeVisible();
+    await expect(page).toHaveTitle(/^Início/);
 
     // Replay do mesmo link cai no login com erro.
     const replay = await request.get(sso, { maxRedirects: 0 });

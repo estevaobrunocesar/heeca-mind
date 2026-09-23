@@ -29,7 +29,9 @@ Base existente: `npm test` (19 suítes de regras puras), `npm run check:lgpd` (i
 
 ## 3. E2E (Playwright — `npm run e2e`)
 
-Suíte em `tests/e2e/` (Playwright 1.63, Chromium, 1 worker, `fullyParallel: false`). O `webServer` do config faz `next build && next start` com `E2E=1` (única chave que libera `http://` na validação de produção do `env.ts` — nunca setar em deploy). Pré-requisitos: banco local de pé, `.env` com `HEECA_PLATFORM_SECRET`, **dev server parado** (build + dev ao mesmo tempo corrompe `.next`). `PW_REUSE=1` reaproveita um servidor já em `:3000`; `E2E_KEEP=1` não apaga os dados no fim.
+Suíte em `tests/e2e/` (Playwright 1.63, Chromium, 1 worker, `fullyParallel: false`). O `webServer` do config faz `next build && next start` com `E2E=1` (única chave que libera `http://` na validação de produção do `env.ts` — nunca setar em deploy). Pré-requisitos: banco local de pé, `.env` com `HEECA_PLATFORM_SECRET`, **dev server parado** (build + dev ao mesmo tempo corrompe `.next`). `PW_REUSE=1` reaproveita um servidor já de pé; `E2E_KEEP=1` não apaga os dados no fim.
+
+**Porta:** o Windows (Hyper-V/WSL) reserva faixas dinâmicas a cada reinício e a 3000 pode cair dentro de uma — o sintoma é `listen EACCES` no build, não teste vermelho (`netsh interface ipv4 show excludedportrange protocol=tcp` lista as faixas). Use `E2E_PORT=3500 npm run e2e`: o config leva a porta para `NEXT_PUBLIC_APP_URL` (URLs de upload/portal, embutidas no build) e para `AUTH_URL` (destino dos redirects de login/SSO). Sem o `AUTH_URL`, o navegador é mandado para a porta do `.env` e toda navegação com redirect morre em `ERR_CONNECTION_REFUSED` — com o servidor de pé e respondendo.
 
 Fixtures (`fixtures.ts`): cada spec cria seu próprio tenant com prefixo `e2e-` direto no banco (dono-psicóloga, recepção, serviço híbrido, grade seg–sex 09–18, paciente) — o app só é exercitado pelo navegador/HTTP. `lastButtonToken()` lê a fila de notificações como o paciente leria o WhatsApp (botão de URL). O teardown apaga tudo com prefixo `e2e-`.
 

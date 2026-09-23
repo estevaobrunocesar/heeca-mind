@@ -22,7 +22,7 @@ npm run cron                  # roda dispatcher/expiração/webhook uma vez (dev
 npm run heeca:sim -- provision ana@exemplo.com          # simula o portal (provision/entitlement/sso) e o Notify (callbacks)
 npm run check:tenant          # isolamento por tenant dos módulos do Mind (banco local)
 npm run check:lgpd            # anonimização (banco local)
-npm run e2e                   # Playwright: faz build + start (E2E=1 libera http local) — dev server PARADO; PW_REUSE=1 reaproveita :3000
+npm run e2e                   # Playwright: build + start (E2E=1 libera http local) — dev server PARADO; PW_REUSE=1 reaproveita; E2E_PORT=3500 se a 3000 estiver reservada pelo Windows (`listen EACCES`)
 npm test
 npm run build                 # build de produção (NODE_ENV=production)
 npm run docker:build          # imagem Docker

@@ -218,6 +218,8 @@ prisma/                schema, migrations, seed
 
 ## Clínicas (multi-profissional)
 
+- Limite de profissionais do plano: `plan.limits.maxProfessionals` do entitlement, espelhado em `Organization.planLimits`. Regras puras em `lib/heeca/limits.ts` (ausente/string/zero/negativo = SEM limite; guard por `typeof max !== "number"`, nunca `=== null`), contagem em `professionalSeats` (`lib/heeca/service.ts`). Aplica em dois lugares: o convite (recusa) e o aceite (entra com `isActive: false`, nunca bloqueia quem já foi autorizado). Só ATIVOS ocupam vaga. **`isActive` é cosmético**: some do público/seletores/listas, mas não tira o acesso da pessoa — o teto é de inclusão, não de operação. Mudar isso é decisão de produto e o ponto seria `resolveActiveProfessional` (`lib/session.ts`).
+
 - Papéis: OWNER (tudo), PROFESSIONAL (só o próprio perfil/agenda/valores), RECEPTIONIST (agenda e pacientes de qualquer profissional; nunca valores, configurações ou equipe). `canViewAnyFinancials` esconde valores da recepção em telas cruzadas (menu, ficha do paciente).
 - Seletor de profissional: cookie `hp_pro` (`setActiveProfessionalAction`), validado no tenant a cada requisição em `resolveActiveProfessional`. PROFESSIONAL ignora o cookie.
 - Equipe (`/configuracoes/equipe`, só OWNER): convites com token hasheado (7 dias) por e-mail; aceite em `/convite/[token]` cria usuário + vínculo (+ perfil com registro profissional/slug) e marca a org como CLINIC. Remover apaga o vínculo, desativa o perfil (agenda preservada) e revoga sessões; bloqueado com sessões futuras.

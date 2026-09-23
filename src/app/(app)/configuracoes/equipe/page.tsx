@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EmptyState } from "@/components/layout/empty-state";
 import { db } from "@/lib/db";
+import { professionalSeats } from "@/lib/heeca/service";
 import { canManageMembers } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { formatDateBR, formatDateTimeBR } from "@/lib/time";
@@ -24,6 +25,7 @@ export default async function TeamPage() {
     }),
     db.invitation.findMany({ where: { organizationId: actor.organizationId, acceptedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" } }),
   ]);
+  const seats = await professionalSeats(actor.organizationId);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -34,6 +36,12 @@ export default async function TeamPage() {
         </Link>
         .
       </p>
+      {seats.max !== null && (
+        <p className="text-sm text-text-muted">
+          Profissionais: <strong className="text-text">{seats.active}</strong> de {seats.max} do seu plano.
+          {seats.active >= seats.max && " Para incluir mais alguém, desative um profissional ou mude de plano na sua conta Heeca."}
+        </p>
+      )}
       <InviteForm />
       <TeamList
         members={memberships.map((m) => ({

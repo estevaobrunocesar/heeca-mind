@@ -43,6 +43,7 @@ Fixtures (`fixtures.ts`): cada spec cria seu próprio tenant com prefixo `e2e-` 
 | `04-documento` | F7 | instalar modelos → enviar da ficha → link: nome divergente recusado, nome do cadastro aceito → `ACCEPTED` com hash de 64 hex → registro interno + e-mail ao profissional na fila |
 | `05-portal` | F9 | pedido de link → token da fila → home → reagendar sessão a 7 dias (`rescheduled=1`) → sessão a 3 h: política de 24h bloqueia (sem botão de cancelar) → "Meus dados" salva endereço → sair e reusar token → `portal?invalid=1` |
 | `06-negativos` | §41 | recepção no prontuário vê "Acesso restrito" e nenhum `ClinicalAccessLog`; tenant B em paciente/prontuário/sessão/export do A → 404 e lista sem o paciente; `/documento/<lixo>` → 404; rota do portal sem cookie volta ao pedido de acesso |
+| `08-limite-plano` | §4 | plano Solo recusa o convite de profissional (recepção não ocupa vaga); desativar devolve vaga; plano sem limite não barra; convidado sem vaga entra com o perfil desativado e `proInactive` no audit |
 | `07-clinica` | §6 (+ storage) | responsável envia logo (PNG 1×1 via `setInputFiles`) → chave `organizations/<org>/logo-*.png`, aparece em `/agendar` (CLINIC) e no portal, arquivo servido; recepção não vê o uploader; remoção zera colunas, apaga o arquivo (404) e audita `organization.logo*` |
 
 Fora da suíte por enquanto: lembrete (cron), PDF do documento no portal (é a mesma página do aceite), pacote com saldo no portal (coberto por `package-rules.test.ts`).

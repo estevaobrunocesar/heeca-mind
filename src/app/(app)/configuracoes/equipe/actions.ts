@@ -6,6 +6,8 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { formValues, invalid, type FormState } from "@/lib/form";
+import { canAddProfessional, seatsFullMessage } from "@/lib/heeca/limits";
+import { professionalSeats } from "@/lib/heeca/service";
 import { canManageMembers } from "@/lib/permissions";
 import { requireActor } from "@/lib/session";
 import { revokeAllSessions } from "@/lib/sessions";
@@ -31,6 +33,15 @@ export async function inviteMemberAction(_prev: FormState, formData: FormData): 
 
   const pending = await db.invitation.findFirst({ where: { organizationId: actor.organizationId, email, acceptedAt: null, expiresAt: { gt: new Date() } }, select: { id: true } });
   if (pending) return { fieldErrors: { email: ["Já existe um convite pendente para este e-mail"] }, values: formValues(formData) };
+
+  // Limite do plano (§4): só profissionais ATIVOS ocupam vaga. Recusamos aqui, no ato
+  // deliberado do responsável — nunca na hora em que a pessoa convidada entra.
+  if (role === "PROFESSIONAL") {
+    const seats = await professionalSeats(actor.organizationId);
+    if (!canAddProfessional(seats.max, seats.active)) {
+      return { error: seatsFullMessage(seats.max!), values: formValues(formData) };
+    }
+  }
 
   const token = randomBytes(32).toString("base64url");
   const invitation = await db.invitation.create({

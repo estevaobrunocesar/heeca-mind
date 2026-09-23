@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { slugify } from "@/lib/slug";
 import { DEFAULT_REGISTRATION_BY_SEGMENT } from "@/lib/registration";
 import { accessStateOf, membershipRoleFor, PRODUCT, verifySignedBody, verifySsoJwt, type Entitlement, type SsoClaims } from "./core";
+import { maxProfessionalsFrom } from "./limits";
 
 /**
  * Integração com o portal heeca.com.br (docs/mind/00-DECISAO-E-REUSO.md, 03-FLUXOS.md F1).
@@ -159,4 +160,20 @@ export async function resolveSsoUser(token: string): Promise<SsoResolution> {
     ok: true,
     user: { id: user.id, email: user.email, name: user.name, organizationId: org.id, role: membership.role, professionalId: user.professional?.id ?? null, mfaEnabled: user.mfaEnabled },
   };
+}
+
+// ──────────────────────────────────────────────────────────────
+// Vagas de profissional (limite do plano)
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Vagas do plano: o teto espelhado do entitlement e quantos profissionais ATIVOS já ocupam.
+ * `max: null` = plano sem limite. Desativar um profissional devolve a vaga.
+ */
+export async function professionalSeats(organizationId: string): Promise<{ max: number | null; active: number }> {
+  const [org, active] = await Promise.all([
+    db.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { planLimits: true } }),
+    db.professional.count({ where: { organizationId, isActive: true } }),
+  ]);
+  return { max: maxProfessionalsFrom(org.planLimits), active };
 }

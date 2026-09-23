@@ -6,6 +6,8 @@ import { signIn } from "@/auth";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { formValues, invalid, type FormState } from "@/lib/form";
+import { canAddProfessional } from "@/lib/heeca/limits";
+import { professionalSeats } from "@/lib/heeca/service";
 import { DEFAULT_REGISTRATION_BY_SEGMENT, registrationSpec } from "@/lib/registration";
 import { slugify } from "@/lib/slug";
 import { acceptInviteSchema } from "@/lib/validation/team";
@@ -61,12 +63,18 @@ export async function acceptInviteAction(_prev: FormState, formData: FormData): 
   const passwordHash = await hash(d.password, 12);
   const slug = inv.role === "PROFESSIONAL" ? await freeSlug(d.displayName) : null;
 
+  // A vaga foi conferida quando o convite saiu, mas pode ter sumido desde então (outra pessoa
+  // aceitou antes, plano rebaixado). Quem já foi autorizado NUNCA é barrado no login: entra com o
+  // perfil desativado e quem decide ativar é o responsável da clínica.
+  const seats = inv.role === "PROFESSIONAL" ? await professionalSeats(inv.organizationId) : null;
+  const proIsActive = seats === null || canAddProfessional(seats.max, seats.active);
+
   const userId = await db.$transaction(async (tx) => {
     const user = await tx.user.create({ data: { email: inv.email, passwordHash, name: d.fullName } });
     await tx.membership.create({ data: { userId: user.id, organizationId: inv.organizationId, role: inv.role } });
     if (inv.role === "PROFESSIONAL") {
       const pro = await tx.professional.create({
-        data: { organizationId: inv.organizationId, userId: user.id, displayName: d.displayName, fullName: d.fullName, registrationKind: spec.kind, registrationNumber, email: inv.email, slug: slug! },
+        data: { organizationId: inv.organizationId, userId: user.id, displayName: d.displayName, fullName: d.fullName, registrationKind: spec.kind, registrationNumber, email: inv.email, slug: slug!, isActive: proIsActive },
       });
       await tx.scheduleSettings.create({ data: { professionalId: pro.id } });
       await tx.professionalPolicy.create({ data: { professionalId: pro.id } });
@@ -81,7 +89,8 @@ export async function acceptInviteAction(_prev: FormState, formData: FormData): 
     action: "member.join",
     entityType: "Membership",
     entityId: userId,
-    after: { role: inv.role, invitationId: inv.id },
+    // `proInactive` marca a entrada sem vaga: o rastro de por que o perfil nasceu desativado.
+    after: { role: inv.role, invitationId: inv.id, ...(proIsActive ? {} : { proInactive: true, planMax: seats!.max, activeAtJoin: seats!.active }) },
   });
 
   await signIn("credentials", { email: inv.email, password: d.password, redirectTo: "/dashboard" });

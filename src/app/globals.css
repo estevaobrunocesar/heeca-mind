@@ -139,3 +139,8 @@ body {
 @utility field-error {
   @apply mt-1 text-xs text-rose-600;
 }
+
+/* Nome do produto e slogan do componente Logo (../brand): o logotipo é curva, o texto é Inter. */
+:root {
+  --font-ui: var(--font-inter);
+}

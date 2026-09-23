@@ -2,15 +2,15 @@
  * Marca Heeca — componente compartilhado entre o portal e os produtos.
  * GERADO por brand/build.mjs a partir de brand/geometry.mjs — não edite; rode `pnpm build` em brand/.
  *
- * Símbolo: duas hastes (H) + swoosh que é a barra do H e vira o braço superior do C + C atrás da haste direita.
- * Cores: partes do H em `currentColor` por padrão (seguem o tema); `onDark` força a prata do kit;
- * a cor do produto é fixa. Wordmark "Heeca": "Hee" na cor do H, "ca" na cor do produto (texto,
- * Montserrat via --font-brand — o app define a variável com next/font, pesos 300/500/700).
+ * Conceito "Tipografia Exclusiva": o logotipo HEECA é desenho (curvas), nunca texto — o arco vermelho
+ * é a barra do H e as barras superiores dos E são vermelhas. O símbolo é o H com o arco.
+ * Cores: letras em `currentColor` por padrão (seguem o tema), `onDark` força branco; o arco é sempre
+ * o vermelho institucional. Nome do produto e slogan usam Inter (var(--font-ui), com fallback).
  *
- *   <Logo product="ticket" />                    símbolo + "Heeca Ticket"   (cabeçalho, sidebar)
- *   <Logo product="ticket" variant="vertical" /> símbolo sobre o nome       (login) — slogan opcional
- *   <Logo product="ticket" variant="symbol" />   só o símbolo               (avatar, favicon inline)
- *   <LogoIntro product="ticket" />               animação de abertura (H → C → conexão → nome)
+ *   <Logo product="ticket" size={26} />          logotipo + TICKET          (cabeçalho, sidebar)
+ *   <Logo product="ticket" variant="vertical" /> tudo centralizado          (login) — slogan opcional
+ *   <Logo product="ticket" variant="symbol" />   só o símbolo (H + arco)    (avatar, favicon inline)
+ *   <LogoIntro product="ticket" />               abertura animada (o arco varre e conecta)
  */
 import type { CSSProperties } from "react";
 
@@ -42,7 +42,7 @@ export const HEECA_PICTOGRAMS: Partial<Record<string, string>> = {
 
 /** Famílias (a cor é da família; os produtos herdam). Fonte: brand/products.mjs. */
 export const HEECA_FAMILIES = {
-  platform: { label: "Plataforma", color: "#e50914", onDark: "#e50914" },
+  platform: { label: "Plataforma", color: "#E31B23", onDark: "#E31B23" },
   ops: { label: "Atendimento e operações", color: "#0a6ee6", onDark: "#0a6ee6" },
   finance: { label: "Financeiro", color: "#0f8a5f", onDark: "#0f8a5f" },
   beauty: { label: "Beleza e estética", color: "#c8306f", onDark: "#c8306f" },
@@ -60,7 +60,7 @@ export type HeecaFamily = keyof typeof HEECA_FAMILIES;
 
 /** Produtos (fonte: brand/products.csv). sigla é única na plataforma; color = cor da família. */
 export const HEECA_PRODUCTS = {
-  "heeca": { name: "", color: "#e50914", fullName: "Heeca", colorOnDark: "#e50914", family: "platform", engine: "Core", sigla: "" },
+  "heeca": { name: "", color: "#E31B23", fullName: "Heeca", colorOnDark: "#E31B23", family: "platform", engine: "Core", sigla: "" },
   "ticket": { name: "Ticket", color: "#0a6ee6", fullName: "Heeca Ticket", colorOnDark: "#0a6ee6", family: "ops", engine: "Ticket", sigla: "Ti" },
   "invoice": { name: "Invoice", color: "#0f8a5f", fullName: "Heeca Invoice", colorOnDark: "#0f8a5f", family: "finance", engine: "Invoice", sigla: "In" },
   "beauty": { name: "Beauty", color: "#c8306f", fullName: "Heeca Beauty", colorOnDark: "#c8306f", family: "beauty", engine: "Schedule", sigla: "Be" },
@@ -87,28 +87,61 @@ export const HEECA_PRODUCTS = {
 export type HeecaProduct = keyof typeof HEECA_PRODUCTS;
 export const SLOGAN = "Sistemas que fazem o seu negócio evoluir.";
 
-const SILVER = "#d4d6db";
-const VIEW = { w: 126, h: 100 };
-const SW = 17;
-const D = {
-  cBase: "M104.26 23.81A30 30 0 1 0 114.07 74.29",
-  topArm: "M104.26 23.81A30 30 0 0 1 114.07 29.71",
-  swoosh: "M14.79 69.41L16.68 69.2L18.58 68.81L20.5 68.29L22.43 67.68L24.39 66.97L26.36 66.18L28.34 65.31L30.34 64.38L32.35 63.38L34.38 62.33L36.41 61.22L38.46 60.07L40.51 58.88L42.58 57.66L44.65 56.41L46.73 55.13L48.81 53.83L50.89 52.52L52.97 51.21L55.05 49.89L57.13 48.57L59.2 47.27L61.27 45.97L63.32 44.7L65.37 43.44L67.4 42.22L69.42 41.04L71.41 39.89L73.39 38.79L75.34 37.74L77.27 36.74L79.16 35.81L81.02 34.94L82.83 34.14L84.61 33.42L86.33 32.79L88 32.23L89.62 31.76L91.16 31.38L92.63 31.1L94.03 30.9L95.34 30.8L96.55 30.78L97.68 30.84L98.72 30.98L99.67 31.19L100.54 31.46L101.35 31.8L107.17 15.82L104.88 15.19L102.59 14.76L100.29 14.53L98.01 14.48L95.76 14.59L93.53 14.85L91.33 15.25L89.16 15.76L87.01 16.39L84.88 17.12L82.77 17.93L80.68 18.83L78.6 19.8L76.52 20.85L74.46 21.95L72.4 23.12L70.35 24.34L68.3 25.6L66.25 26.91L64.22 28.26L62.18 29.64L60.15 31.05L58.13 32.49L56.11 33.94L54.1 35.41L52.1 36.89L50.11 38.38L48.13 39.86L46.15 41.34L44.2 42.81L42.25 44.27L40.33 45.71L38.42 47.12L36.53 48.51L34.66 49.86L32.81 51.18L30.99 52.45L29.2 53.68L27.43 54.85L25.7 55.97L23.99 57.03L22.33 58.02L20.7 58.94L19.11 59.8L17.56 60.59L16.06 61.3L14.61 61.95L13.21 62.59Z",
-  swooshCenter: "M14 66C40 60 79.83 14.92 104.26 23.81",
+/** Tokens do handoff (color.brand.*). */
+export const HEECA_COLORS = { red: "#E31B23", redHover: "#B90F19", black: "#15171A", graphite: "#30343A", textSecondary: "#667085", border: "#E5E7EB", warm: "#F7F4EF" } as const;
+
+const RED = HEECA_COLORS.red;
+const SYMBOL = { w: 148, h: 100 };
+const WORD = { w: 573, h: 100 };
+const G = {
+  stems: [{"x":17,"w":28},{"x":104,"w":28}],
+  stemY: 0,
+  arc: "M0 81.5A90.6 90.6 0 0 1 148 81.5A148.2 148.2 0 0 0 0 81.5Z",
+  symbolStems: [{ x: 17, w: 28 }, { x: 104, w: 28 }],
+  eBar: {"x":0,"y":0,"w":85,"h":20},
+  eBody: "M0 40H74V60H26V80H85V100H0Z",
+  eX: [163,266],
+  c: {"x":370,"d":"M87 0H21A21 21 0 0 0 0 21V79A21 21 0 0 0 21 100H84V80H36A11 11 0 0 1 25 69V31A11 11 0 0 1 36 20H87Z"},
+  a: {"x":462,"d":"M0 100L43.5 0H67.5L111 100H87L55.5 27.9L24 100Z"},
 };
 
-type SymbolProps = { h?: string; accent: string; size?: number; title?: string; className?: string; style?: CSSProperties };
+/** `size` é a altura de referência do sinal; as maiúsculas do logotipo têm 62 % dela. */
+const CAP_RATIO = 0.62;
 
-/** Símbolo em malha 126 × 100 (sem área de respiro). `size` = altura em px. */
-export function HeecaSymbol({ h = "currentColor", accent, size = 32, title, className, style }: SymbolProps) {
+/** Fonte de apoio (nome do produto e slogan): Inter. O logotipo não usa fonte. */
+const UI_FONT = "var(--font-ui, var(--font-brand, Inter)), Inter, system-ui, sans-serif";
+
+type SymbolProps = { h?: string; accent?: string; size?: number; title?: string; className?: string; style?: CSSProperties; cls?: string };
+
+/** Símbolo: o H com o arco. `size` = altura em px (caixa 148 × 100). */
+export function HeecaSymbol({ h = "currentColor", accent = RED, size = 32, title, className, style, cls }: SymbolProps) {
   return (
-    <svg viewBox={`0 0 ${VIEW.w} ${VIEW.h}`} height={size} width={(size * VIEW.w) / VIEW.h} className={className} style={style} role={title ? "img" : undefined} aria-hidden={title ? undefined : true}>
+    <svg viewBox={`0 0 ${SYMBOL.w} ${SYMBOL.h}`} height={size} width={(size * SYMBOL.w) / SYMBOL.h} className={className} style={style} role={title ? "img" : undefined} aria-hidden={title ? undefined : true}>
       {title ? <title>{title}</title> : null}
-      <path d={D.cBase} fill="none" stroke={accent} strokeWidth={SW} strokeLinecap="round" />
-      <rect x={10} y={6} width={17} height={88} rx={1.5} fill={h} />
-      <rect x={62} y={6} width={17} height={88} rx={1.5} fill={h} />
-      <path d={D.swoosh} fill={accent} />
-      <path d={D.topArm} fill="none" stroke={accent} strokeWidth={SW} strokeLinecap="round" />
+      {G.symbolStems.map((s, i) => <rect key={i} className={cls ? `${cls}0` : undefined} x={s.x} y={0} width={s.w} height={100} fill={h} />)}
+      <path className={cls ? `${cls}arc` : undefined} d={G.arc} fill={accent} />
+    </svg>
+  );
+}
+
+/** Logotipo HEECA em curvas. `height` = altura das maiúsculas em px. */
+export function HeecaWordmark({ ink = "currentColor", accent = RED, height = 16, className, style, cls }: { ink?: string; accent?: string; height?: number; className?: string; style?: CSSProperties; cls?: string }) {
+  const k = (n: string) => (cls ? `${cls}${n}` : undefined);
+  return (
+    <svg viewBox={`0 0 ${WORD.w} ${WORD.h}`} height={height} width={(height * WORD.w) / WORD.h} className={className} style={{ display: "block", ...style }} aria-hidden="true">
+      {G.stems.map((s, i) => <rect key={i} className={k("0")} x={s.x} y={0} width={s.w} height={100} fill={ink} />)}
+      <path className={k("arc")} d={G.arc} fill={accent} />
+      {/* o transform fica no <g> externo: a animação termina em transform:none e sobrescreveria o atributo */}
+      {G.eX.map((x, i) => (
+        <g key={i} transform={`translate(${x} 0)`}>
+          <g className={k(String(i + 1))}>
+            <rect x={G.eBar.x} y={G.eBar.y} width={G.eBar.w} height={G.eBar.h} fill={accent} />
+            <path d={G.eBody} fill={ink} />
+          </g>
+        </g>
+      ))}
+      <g transform={`translate(${G.c.x} 0)`}><path className={k("3")} d={G.c.d} fill={ink} /></g>
+      <g transform={`translate(${G.a.x} 0)`}><path className={k("4")} d={G.a.d} fill={ink} /></g>
     </svg>
   );
 }
@@ -116,75 +149,56 @@ export function HeecaSymbol({ h = "currentColor", accent, size = 32, title, clas
 export type LogoProps = {
   product?: HeecaProduct;
   variant?: "horizontal" | "vertical" | "symbol";
-  /** Superfície sempre escura: partes do H na prata do kit. */
+  /** Superfície sempre escura: letras em branco. */
   onDark?: boolean;
-  /** Mostra o slogan sob o wordmark (só em tamanhos grandes: login, materiais). */
+  /** Mostra o slogan sob o logotipo (só em tamanhos grandes: login, materiais). */
   slogan?: boolean;
-  /** Altura do símbolo em px. */
+  /** Altura de referência em px: no variant "symbol" é a altura do símbolo; nos demais, as
+   * maiúsculas do logotipo têm 62 % dela (mesma escala visual do kit anterior). */
   size?: number;
   className?: string;
   style?: CSSProperties;
 };
 
-const BRAND_FONT = "var(--font-brand)";
-
 export function Logo({ product = "heeca", variant = "horizontal", onDark = false, slogan = false, size = 32, className, style }: LogoProps) {
   const p = HEECA_PRODUCTS[product];
-  const h = onDark ? SILVER : "currentColor";
-  const accent = onDark ? p.colorOnDark : p.color;
-  const fontSize = (size * 0.62) / 0.7; // maiúsculas = 62 % da altura do símbolo
-  const wordmark: CSSProperties = { fontFamily: BRAND_FONT, fontWeight: 700, fontSize, letterSpacing: "-0.03em", lineHeight: 1, color: h, whiteSpace: "nowrap" };
-  const sloganStyle: CSSProperties = { fontFamily: BRAND_FONT, fontWeight: 300, fontSize: fontSize * 0.29, letterSpacing: "0.06em", lineHeight: 1.3, color: h, opacity: 0.9 };
-  const name = (
-    <>
-      Hee<span style={{ color: accent }}>ca</span>
-      {p.name ? <> <span style={{ fontWeight: 500, color: accent }}>{p.name}</span></> : null}
-    </>
-  );
-  if (variant === "symbol") return <HeecaSymbol h={h} accent={accent} size={size} title={p.fullName} className={className} style={style} />;
-  if (variant === "vertical") {
-    return (
-      <span className={className} style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: size * 0.08, textAlign: "center", ...style }} aria-label={p.fullName} role="img">
-        <HeecaSymbol h={h} accent={accent} size={size} />
-        <span style={{ ...wordmark, fontSize: fontSize * 0.9 }}>{name}</span>
-        {slogan ? <span style={{ ...sloganStyle, fontSize: fontSize * 0.26, maxWidth: size * 2.4 }}>{SLOGAN}</span> : null}
-      </span>
-    );
-  }
+  const ink = onDark ? "#FFFFFF" : "currentColor";
+  const productColor = onDark ? p.colorOnDark : p.color;
+  if (variant === "symbol") return <HeecaSymbol h={ink} size={size} title={p.fullName} className={className} style={style} />;
+  const center = variant === "vertical";
+  const cap = size * CAP_RATIO;
+  const nameStyle: CSSProperties = { fontFamily: UI_FONT, fontWeight: 600, fontSize: cap * 0.33, letterSpacing: "0.18em", lineHeight: 1, color: productColor, textTransform: "uppercase", whiteSpace: "nowrap", marginRight: "-0.18em" };
+  const sloganStyle: CSSProperties = { fontFamily: UI_FONT, fontWeight: 400, fontSize: cap * 0.31, lineHeight: 1.35, color: onDark ? "#C9CBD1" : "var(--heeca-text-secondary, #667085)", whiteSpace: "nowrap" };
   return (
-    <span className={className} style={{ display: "inline-flex", alignItems: "center", gap: size * 0.1, ...style }} aria-label={p.fullName} role="img">
-      <HeecaSymbol h={h} accent={accent} size={size} />
-      <span style={{ display: "grid", gap: fontSize * 0.12 }}>
-        <span style={wordmark}>{name}</span>
-        {slogan ? <span style={sloganStyle}>{SLOGAN}</span> : null}
-      </span>
+    <span className={className} style={{ display: "inline-grid", gap: cap * 0.26, justifyItems: center ? "center" : "start", textAlign: center ? "center" : "left", ...style }} aria-label={p.fullName} role="img">
+      <HeecaWordmark ink={ink} height={cap} />
+      {p.name ? <span style={nameStyle}>{p.name}</span> : null}
+      {slogan ? <span style={sloganStyle}>{SLOGAN}</span> : null}
     </span>
   );
 }
 
 /**
- * Ícone de app/produto (o mesmo desenho de dist/icon): fundo na cor da família, sigla branca e o
- * símbolo HC pequeno. A plataforma ("heeca") usa fundo escuro com o símbolo grande.
- * Uso: mapa do ecossistema, seletor de produtos, avatar do produto em listas.
+ * Ícone de app/produto (o mesmo desenho de dist/icon): fundo na cor da família, pictograma branco e o
+ * H pequeno no canto. A plataforma ("heeca") usa fundo Heeca Black com o H e o arco.
  */
 export function HeecaAppIcon({ product, size = 48, radius = 22.5, className, style }: { product: HeecaProduct; size?: number; radius?: number; className?: string; style?: CSSProperties }) {
   const p = HEECA_PRODUCTS[product];
+  const mark = (h: string, accent: string) => (
+    <>
+      {G.symbolStems.map((s, i) => <rect key={i} x={s.x} y={0} width={s.w} height={100} fill={h} />)}
+      <path d={G.arc} fill={accent} />
+    </>
+  );
   if (!p.name) {
-    const s = 0.62;
+    const s = 0.6;
     return (
       <svg viewBox="0 0 100 100" width={size} height={size} className={className} style={style} role="img" aria-label="Heeca">
-        <rect width="100" height="100" rx={radius} fill="#0a0a0a" />
-        <g transform={`translate(${((100 - VIEW.w * s) / 2).toFixed(2)} ${((100 - VIEW.h * s) / 2).toFixed(2)}) scale(${s})`}>
-          <path d={D.cBase} fill="none" stroke={p.color} strokeWidth={SW} strokeLinecap="round" />
-          <rect x={10} y={6} width={17} height={88} rx={1.5} fill={SILVER} />
-          <rect x={62} y={6} width={17} height={88} rx={1.5} fill={SILVER} />
-          <path d={D.swoosh} fill={p.color} />
-          <path d={D.topArm} fill="none" stroke={p.color} strokeWidth={SW} strokeLinecap="round" />
-        </g>
+        <rect width="100" height="100" rx={radius} fill={HEECA_COLORS.black} />
+        <g transform={`translate(${((100 - SYMBOL.w * s) / 2).toFixed(2)} ${((100 - SYMBOL.h * s) / 2).toFixed(2)}) scale(${s})`}>{mark("#FFFFFF", RED)}</g>
       </svg>
     );
   }
-  const fs = p.sigla.length > 2 ? 40 : 50;
   const picto = HEECA_PICTOGRAMS[product];
   const gid = `hg-${product}`;
   return (
@@ -197,65 +211,31 @@ export function HeecaAppIcon({ product, size = 48, radius = 22.5, className, sty
       <rect width="100" height="100" rx={radius} fill={`url(#${gid})`} />
       <rect width="100" height="100" rx={radius} fill={`url(#${gid}-s)`} />
       {picto ? (
-        <g transform="translate(21 17) scale(2.4167)" fill="none" stroke="#fff" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: picto }} />
+        <g transform="translate(21 15) scale(2.3333)" fill="none" stroke="#fff" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: picto }} />
       ) : (
-        <text x="47" y="66" textAnchor="middle" fontFamily={BRAND_FONT} fontWeight={700} fontSize={fs} letterSpacing="-0.04em" fill="#fff">{p.sigla}</text>
+        <text x="50" y="64" textAnchor="middle" fontFamily={UI_FONT} fontWeight={600} fontSize={p.sigla.length > 2 ? 40 : 50} fill="#fff">{p.sigla}</text>
       )}
-      <g transform="translate(70 77) scale(0.17)" opacity={0.95}>
-        <path d={D.cBase} fill="none" stroke="#fff" strokeWidth={SW} strokeLinecap="round" />
-        <rect x={10} y={6} width={17} height={88} rx={1.5} fill="#fff" />
-        <rect x={62} y={6} width={17} height={88} rx={1.5} fill="#fff" />
-        <path d={D.swoosh} fill="#fff" />
-        <path d={D.topArm} fill="none" stroke="#fff" strokeWidth={SW} strokeLinecap="round" />
-      </g>
+      <g transform="translate(66 74) scale(0.2)" opacity={0.95}>{mark("#fff", "#fff")}</g>
     </svg>
   );
 }
 
 /**
- * Abertura animada (~3,5 s): 1. H surge · 2. C se forma · 3. conexão (swoosh) · 4. nome revela.
+ * Abertura animada (~2,5 s): hastes sobem · o arco varre e conecta · E, E, C, A entram · nome · slogan.
  * Respeita prefers-reduced-motion (mostra o estado final). Use em splash/login; não em cabeçalhos.
  */
-export function LogoIntro({ product = "heeca", onDark = true, size = 96, slogan = true, className, style }: Omit<LogoProps, "variant">) {
+export function LogoIntro({ product = "heeca", onDark = true, size = 64, slogan = true, className, style }: Omit<LogoProps, "variant">) {
   const p = HEECA_PRODUCTS[product];
-  const h = onDark ? SILVER : "currentColor";
-  const accent = onDark ? p.colorOnDark : p.color;
-  const fontSize = (size * 0.62) / 0.7;
-  const letters: [string, string][] = [["H", h], ["e", h], ["e", h], ["c", accent], ["a", accent]];
-  const css = `
-    .hi-stem,.hi-rstem{transform-box:fill-box;transform-origin:50% 100%;transform:scaleY(0)}
-    .hi-c,.hi-arm{stroke-dasharray:200;stroke-dashoffset:200}
-    .hi-mask{stroke-dasharray:160;stroke-dashoffset:160}
-    .hi-l,.hi-slogan{opacity:0}
-    .hi-stem{animation:hi-up .55s cubic-bezier(.2,.8,.2,1) .1s forwards}
-    .hi-rstem{animation:hi-up .55s cubic-bezier(.2,.8,.2,1) .25s forwards}
-    .hi-c{animation:hi-draw .8s cubic-bezier(.4,0,.2,1) 1s forwards}
-    .hi-mask{animation:hi-draw .75s cubic-bezier(.4,0,.2,1) 1.8s forwards}
-    .hi-arm{animation:hi-draw .35s ease-out 2.4s forwards}
-    .hi-l{animation:hi-rise .4s ease-out forwards}
-    .hi-slogan{animation:hi-fade .6s ease-out 3.4s forwards}
-    @keyframes hi-up{to{transform:scaleY(1)}}
-    @keyframes hi-draw{to{stroke-dashoffset:0}}@keyframes hi-rise{from{opacity:0;transform:translateY(.06em)}to{opacity:1;transform:none}}@keyframes hi-fade{to{opacity:1}}
-    @media (prefers-reduced-motion:reduce){.hi-stem,.hi-rstem,.hi-c,.hi-arm,.hi-mask,.hi-l,.hi-slogan{animation:none!important}.hi-stem,.hi-rstem,.hi-c,.hi-arm,.hi-l,.hi-slogan{opacity:1;transform:none;stroke-dashoffset:0}.hi-mask{stroke-dashoffset:0}}
-  `;
+  const ink = onDark ? "#FFFFFF" : "currentColor";
+  const productColor = onDark ? p.colorOnDark : p.color;
+  const cap = size * CAP_RATIO;
+  const css = ` .hi-0{opacity:0;transform-box:fill-box;transform-origin:50% 100%;animation:hi-up .5s cubic-bezier(.2,.8,.2,1) .1s forwards} .hi-arc{clip-path:inset(0 100% 0 0);animation:hi-sweep .7s cubic-bezier(.4,0,.2,1) .55s forwards} .hi-1,.hi-2,.hi-3,.hi-4,.hi-n,.hi-s{opacity:0;animation:hi-rise .4s ease-out forwards} .hi-1{animation-delay:1.15s}.hi-2{animation-delay:1.27s}.hi-3{animation-delay:1.39s}.hi-4{animation-delay:1.51s} .hi-n{animation-delay:1.8s}.hi-s{animation-delay:2s;animation-duration:.6s} @keyframes hi-up{from{opacity:0;transform:scaleY(.2)}to{opacity:1;transform:none}} @keyframes hi-sweep{to{clip-path:inset(0 0 0 0)}} @keyframes hi-rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}} @media (prefers-reduced-motion:reduce){[class^="hi-"]{animation:none!important;opacity:1!important;transform:none!important;clip-path:none!important}} `;
   return (
-    <span className={className} style={{ display: "inline-flex", alignItems: "center", gap: size * 0.1, ...style }} aria-label={p.fullName} role="img">
+    <span className={className} style={{ display: "inline-grid", gap: cap * 0.26, justifyItems: "start", ...style }} aria-label={p.fullName} role="img">
       <style>{css}</style>
-      <svg viewBox={`0 0 ${VIEW.w} ${VIEW.h}`} height={size} width={(size * VIEW.w) / VIEW.h} aria-hidden="true">
-        <defs><mask id="hi-sw"><path className="hi-mask" d={D.swooshCenter} fill="none" stroke="#fff" strokeWidth={24} strokeLinecap="round" /></mask></defs>
-        <path className="hi-c" d={D.cBase} fill="none" stroke={accent} strokeWidth={SW} strokeLinecap="round" />
-        <rect className="hi-stem" x={10} y={6} width={17} height={88} rx={1.5} fill={h} />
-        <rect className="hi-rstem" x={62} y={6} width={17} height={88} rx={1.5} fill={h} />
-        <g mask="url(#hi-sw)"><path d={D.swoosh} fill={accent} /></g>
-        <path className="hi-arm" d={D.topArm} fill="none" stroke={accent} strokeWidth={SW} strokeLinecap="round" />
-      </svg>
-      <span style={{ display: "grid", gap: fontSize * 0.12 }}>
-        <span style={{ fontFamily: BRAND_FONT, fontWeight: 700, fontSize, letterSpacing: "-0.03em", lineHeight: 1, whiteSpace: "nowrap" }}>
-          {letters.map(([ch, color], i) => <span key={i} className="hi-l" style={{ display: "inline-block", color, animationDelay: `${2.7 + i * 0.1}s` }}>{ch}</span>)}
-          {p.name ? <span className="hi-l" style={{ display: "inline-block", fontWeight: 500, color: accent, animationDelay: "3.2s" }}>&nbsp;{p.name}</span> : null}
-        </span>
-        {slogan ? <span className="hi-slogan" style={{ fontFamily: BRAND_FONT, fontWeight: 300, fontSize: fontSize * 0.29, letterSpacing: "0.06em", lineHeight: 1.3, color: h }}>{SLOGAN}</span> : null}
-      </span>
+      <HeecaWordmark ink={ink} height={cap} cls="hi-" />
+      {p.name ? <span className="hi-n" style={{ fontFamily: UI_FONT, fontWeight: 600, fontSize: cap * 0.33, letterSpacing: "0.18em", lineHeight: 1, color: productColor, textTransform: "uppercase", whiteSpace: "nowrap" }}>{p.name}</span> : null}
+      {slogan ? <span className="hi-s" style={{ fontFamily: UI_FONT, fontWeight: 400, fontSize: cap * 0.31, lineHeight: 1.35, color: onDark ? "#C9CBD1" : "var(--heeca-text-secondary, #667085)", whiteSpace: "nowrap" }}>{SLOGAN}</span> : null}
     </span>
   );
 }

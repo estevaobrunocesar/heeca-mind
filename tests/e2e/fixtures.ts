@@ -5,6 +5,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import type { Page } from "@playwright/test";
 import { PrismaClient } from "../../src/generated/prisma/client";
 import { signBody, signHs256Jwt } from "../../src/lib/heeca/core";
+import { E2E_CLIENT_IP } from "./client-ip";
 
 /**
  * Fixtures do E2E: dados reais no banco local, todos com prefixo `e2e-` (limpos no teardown).
@@ -39,24 +40,28 @@ export async function createTenant(tag: string): Promise<Tenant> {
 export async function cleanupAll() {
   await db.organization.deleteMany({ where: { name: { startsWith: E2E } } });
   await db.user.deleteMany({ where: { email: { startsWith: E2E } } });
-  // Rate limits por IP/telefone acumulam entre rodadas locais (tudo sai de 127.0.0.1).
+  // Contadores de rate limit acumulam entre rodadas (toda a suíte vem do mesmo IP declarado).
+  // Aqui, no início da rodada, zerar tudo é seguro: não há teste em curso para mascarar.
   await db.rateLimit.deleteMany({});
 }
 
 /**
  * Zera SÓ os contadores de login antes de entrar.
  *
- * `clientIp()` cai para "unknown" quando não há x-forwarded-for, então TODO login da suíte
- * cai no mesmo balde `login:ip` (20 por 15 min): com a suíte crescendo, as últimas specs
- * começam a falhar por limite acumulado das anteriores — esperando /dashboard, sem nada a ver
- * com o cenário que testam. Apagar a tabela inteira resolveria, mas levaria junto os limites
- * de agendamento público, portal e tokens, que os testes precisam ver funcionando de verdade.
- * As chaves são sha256(`${scope}:${identifier}`) — dá para remover exatamente as duas.
+ * Todo login da suíte cai no mesmo balde `login:ip` (20 por 15 min): com a suíte crescendo, as
+ * últimas specs passam a falhar por limite acumulado das anteriores — esperando /dashboard, sem
+ * nada a ver com o cenário que testam. Apagar a tabela inteira resolveria, mas levaria junto os
+ * limites de agendamento público, portal e tokens, que os testes precisam ver funcionando.
+ *
+ * O identificador é conhecido porque o config manda `x-forwarded-for: E2E_CLIENT_IP` em toda
+ * requisição. Sem esse header seria o IP da conexão local — "::1" no Windows, "127.0.0.1" em
+ * outros — e a limpeza viraria adivinhação: um filtro que erra o identificador não falha, só
+ * silenciosamente não limpa nada.
  */
 async function clearLoginThrottle(email: string) {
   const key = (scope: string, id: string) => createHash("sha256").update(`${scope}:${id}`).digest("hex");
   await db.rateLimit.deleteMany({
-    where: { key: { in: [key("login:email", email), key("login:ip", "unknown"), key("login:ip", "127.0.0.1")] } },
+    where: { key: { in: [key("login:email", email), key("login:ip", E2E_CLIENT_IP)] } },
   });
 }
 

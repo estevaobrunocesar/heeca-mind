@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { E2E_CLIENT_IP } from "./tests/e2e/client-ip";
 
 /**
  * E2E (docs/mind/07-TESTES.md §3). Roda contra `next start` de um build de produção — nunca contra
@@ -33,6 +34,11 @@ export default defineConfig({
   globalTeardown: "./tests/e2e/global-teardown.ts",
   use: {
     baseURL: BASE,
+    // IP fixo em toda requisição: `clientIp()` lê x-forwarded-for primeiro, então os limitadores
+    // passam a ter identificador conhecido e igual em qualquer máquina. Sem isso, o IP é o da
+    // conexão local — "::1" no Windows, "127.0.0.1" em outros — e o teste teria de adivinhar qual
+    // chave limpar. Também é mais fiel à produção, que roda atrás de proxy. Faixa TEST-NET-3.
+    extraHTTPHeaders: { "x-forwarded-for": E2E_CLIENT_IP },
     locale: "pt-BR",
     timezoneId: "America/Sao_Paulo",
     trace: "retain-on-failure",

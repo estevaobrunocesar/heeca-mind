@@ -39,6 +39,7 @@ export const HEECA_PICTOGRAMS: Partial<Record<string, string>> = {
   "class": "<path d=\"M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z\" />\n  <path d=\"M22 10v6\" />\n  <path d=\"M6 12.5V16a6 3 0 0 0 12 0v-3.5\" />",
   "store": "<path d=\"M16 10a4 4 0 0 1-8 0\" />\n  <path d=\"M3.103 6.034h17.794\" />\n  <path d=\"M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z\" />",
   "kids": "<path d=\"M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5\" />\n  <path d=\"M15 12h.01\" />\n  <path d=\"M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1\" />\n  <path d=\"M9 12h.01\" />",
+  "adv": "<path d=\"M12 3v18\" />\n  <path d=\"m19 8 3 8a5 5 0 0 1-6 0zV7\" />\n  <path d=\"M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1\" />\n  <path d=\"m5 8 3 8a5 5 0 0 1-6 0zV7\" />\n  <path d=\"M7 21h10\" />",
 };
 
 /** Famílias (a cor é da família; os produtos herdam). Fonte: brand/products.mjs. */
@@ -57,6 +58,7 @@ export const HEECA_FAMILIES = {
   education: { label: "Educação", color: "#1e3a8a", onDark: "#7c9cf5" },
   commerce: { label: "Comércio", color: "#6d28d9", onDark: "#a883f7" },
   childcare: { label: "Creches e educação infantil", color: "#92710f", onDark: "#92710f" },
+  legal: { label: "Advocacia e serviços jurídicos", color: "#7a3d1f", onDark: "#d18661" },
 } as const;
 export type HeecaFamily = keyof typeof HEECA_FAMILIES;
 
@@ -86,6 +88,7 @@ export const HEECA_PRODUCTS = {
   "class": { name: "Class", color: "#1e3a8a", fullName: "Heeca Class", colorOnDark: "#7c9cf5", family: "education", engine: "Schedule", sigla: "Cl" },
   "store": { name: "Store", color: "#6d28d9", fullName: "Heeca Store", colorOnDark: "#a883f7", family: "commerce", engine: "Commerce", sigla: "St" },
   "kids": { name: "Kids", color: "#92710f", fullName: "Heeca Kids", colorOnDark: "#92710f", family: "childcare", engine: "Schedule", sigla: "Ki" },
+  "adv": { name: "ADV", color: "#7a3d1f", fullName: "Heeca ADV", colorOnDark: "#d18661", family: "legal", engine: "Service", sigla: "Ad" },
 } as const;
 export type HeecaProduct = keyof typeof HEECA_PRODUCTS;
 export const SLOGAN = "Sistemas que fazem o seu negócio evoluir.";

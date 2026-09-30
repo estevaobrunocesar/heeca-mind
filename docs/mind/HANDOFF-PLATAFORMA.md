@@ -21,7 +21,7 @@ O Mind **não** nasce do motor Dental: é o `hecca_psico` integrado ao Core. Pro
 5. **R2**: bucket privado `heeca-mind` + token → `STORAGE_DRIVER=s3`, `S3_*` (prefixo de chave `mind/`).
 6. **Coolify**: app `heeca-mind` (Dockerfile, standalone, `docker/entrypoint.sh` roda `migrate deploy`) + `heeca-mind-db` (Postgres 16) + Scheduled Task `GET /api/cron` com `Bearer CRON_SECRET` a cada minuto. Variáveis completas em `docs/DEPLOY.md`. Obrigatórias em produção: `HEECA_PLATFORM_SECRET`, `ENCRYPTION_KEY` (32 bytes base64 — **guardar fora do banco**), `AUTH_SECRET`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL=https://mind.heeca.com.br`, SMTP Resend (`EMAIL_DRIVER=smtp`, `SMTP_URL`, `EMAIL_FROM="Heeca Mind <no-reply@heeca.com.br>"`).
 7. **DNS**: `mind.heeca.com.br` no `infra/dns.mjs`. Monitor: alvo `https://mind.heeca.com.br/api/health`.
-8. **UI kit**: `data-accent="mind"` em `ui/tokens.css` quando o kit de marca definir a cor (hoje o app usa sálvia `#5f7a6a` provisória em `--primary`).
+8. ~~**UI kit**: `data-accent="mind"` em `ui/tokens.css` quando o kit de marca definir a cor~~ — **feito** (30/09/2026): `ui/tokens.css` já tem `[data-accent="mind"]` (grupo saúde, com `dental`/`move`, `#f06511`) e o app adotou a mesma cor na reforma do padrão de painel (`globals.css`, `--color-primary`). Nada pendente.
 9. **Provisionamento sintético** depois do deploy: o app tem simulador (`npm run heeca:sim`), mas em produção use o portal; o `/api/heeca/provision` sem assinatura deve responder 401.
 
 ## Segredos gerados pelo app (não pela plataforma)

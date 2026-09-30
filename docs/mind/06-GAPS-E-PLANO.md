@@ -126,7 +126,7 @@ Assinatura recorrente do paciente (§21), gateway de pagamento do paciente, mult
 | D8 | Domínio público | `mind.heeca.com.br/agendar/<slug>` · wildcard por tenant | caminho por slug | Etapa 1 |
 | D9 | Registrar no `ecosystem.ts`/`PENDENCIAS.md` que Health tem dois motores (Dental, Mind) e Nutri/Fono nascem do Mind | sim · não | sim | plataforma |
 
-Todas implementadas conforme a coluna "Recomendação", exceto D7 (cor do produto), que continua provisória (`--primary` sálvia em `globals.css`) até o kit de marca.
+Todas implementadas conforme a coluna "Recomendação". D7 foi resolvida na reforma do padrão de painel (30/09/2026): a sálvia provisória saiu, `globals.css` adota a cor da família saúde do kit de marca (`#f06511`), que já bate com `[data-accent="mind"]` em `ui/tokens.css` (agrupado com `dental`/`move`, também definido pela plataforma) — nada pendente dos dois lados.
 
 ## 6. Ajustes de rota feitos durante a execução (não previstos no plano)
 
@@ -140,7 +140,7 @@ Todas implementadas conforme a coluna "Recomendação", exceto D7 (cor do produt
 
 ## 7. Dívidas conhecidas (não bloqueiam o §41)
 
-- Cor de acento do Mind (D7).
+Nenhuma em aberto — a última (cor de acento do Mind, D7) foi resolvida em 30/09/2026 (ver §5).
 
 ## 8. Tarefas da plataforma para a prateleira (chat da plataforma)
 

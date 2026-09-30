@@ -64,16 +64,16 @@ Fonte da verdade: `src/lib/whatsapp/templates.ts`. Dois grupos:
 
 | `NotificationType` | Template | Variáveis (ordem = {{1}}, {{2}}…) | Botão |
 |---|---|---|---|
-| REMINDER_2H | `heeca_mind_lembrete_2h` | cliente, estabelecimento, profissional, hora | — |
-| SESSION_LINK | `heeca_mind_sessao_online` | cliente, estabelecimento, profissional, hora, plataforma | URL `/confirmar/<token>` (mostra o link da sala no horário) |
-| WAITLIST_JOINED | `heeca_mind_lista_espera` | cliente, estabelecimento, profissional | — |
-| WAITLIST_OFFER | `heeca_mind_oferta_horario` | cliente, estabelecimento, profissional, modalidade, data, hora, prazo (h) | URL `/confirmar/<token>` |
-| FORM_REQUEST | `heeca_mind_formulario` | cliente, estabelecimento, profissional, título do formulário | URL `/formulario/<token>` |
-| DOCUMENT_REQUEST | `heeca_mind_documento` | cliente, estabelecimento, profissional, título do documento | URL `/documento/<token>` |
+| REMINDER_2H | `heeca_mind_lembrete_2h` | cliente, profissional, hora | — |
+| SESSION_LINK | `heeca_mind_sessao_online` | cliente, profissional, hora, plataforma | URL `/confirmar/<token>` (mostra o link da sala no horário) |
+| WAITLIST_JOINED | `heeca_mind_lista_espera` | cliente, profissional | — |
+| WAITLIST_OFFER | `heeca_mind_oferta_horario` | cliente, profissional, modalidade, data, hora, prazo (h) | URL `/confirmar/<token>` |
+| FORM_REQUEST | `heeca_mind_formulario` | cliente, profissional, título do formulário | URL `/formulario/<token>` |
+| DOCUMENT_REQUEST | `heeca_mind_documento` | cliente, profissional, título do documento | URL `/documento/<token>` |
 | PORTAL_LOGIN | `heeca_mind_acesso_portal` | cliente, estabelecimento | URL `/portal/entrar/<token>` (token continua expirando em 15 min e de uso único — só o texto não fala mais nisso, ver nota) |
 | SURVEY | `heeca_mind_pesquisa` | cliente, estabelecimento | URL `/pesquisa/<token>` (24 h após a sessão, se ativado) |
 
-"Estabelecimento" segue a mesma regra dos templates unificados: nome da clínica, ou o nome do profissional quando é autônomo (`establishmentOf`, `src/lib/notifications.ts`). Adicionado aos 6 primeiros em 29/09/2026 (boa prática de identificação do remetente — o paciente pode não reconhecer "Dra. Ana" tão bem quanto o nome do consultório) e reordenado no mesmo dia: a Meta proíbe corpo começando por variável, então `establishment` foi para {{2}} em todos os 8, e o corpo abre com o texto fixo "Mensagem de {{2}}: Olá, {{1}}! …" — ver `reference` de cada um em `templates.ts`. `heeca_mind_pesquisa` e `heeca_mind_acesso_portal` já respeitavam a regra da Meta (abriam com "Olá, {{1}}!"), mas ganharam o mesmo texto por consistência; params e ordem não mudaram nos dois. `heeca_mind_acesso_portal` também perdeu a frase "vale por 15 minutos e só funciona uma vez" numa correção anterior — a Meta rejeitou por soar como mensagem de autenticação/OTP; a expiração e o uso único do token continuam aplicados no servidor (`src/lib/portal/service.ts`), só o texto da mensagem não anuncia mais.
+**Histórico (29/09/2026, revertido no mesmo dia):** a plataforma pediu para adicionar `establishment` aos 6 primeiros (boa prática de identificação do remetente) e depois corrigiu a ordem (a Meta proíbe corpo começando por variável). Antes de qualquer um dos dois textos ir ao ar, a Meta aprovou os 6 **no texto original**, sem `establishment` — mudar o texto de um template já aprovado exigiria um nome novo (perde a aprovação), então a mudança foi revertida no código sem nunca ter sido publicada. `heeca_mind_pesquisa` e `heeca_mind_acesso_portal` são o caso oposto: nunca tinham sido aprovados, a plataforma os recriou direto no formato novo ("Mensagem de {{2}}: Olá, {{1}}! …", `establishment` em {{2}}) e é esse texto que está pendente de aprovação — por isso os dois continuam citando `establishment` e os outros 6 não. `heeca_mind_acesso_portal` também perdeu a frase "vale por 15 minutos e só funciona uma vez" numa correção anterior — a Meta rejeitou por soar como mensagem de autenticação/OTP; a expiração e o uso único do token continuam aplicados no servidor (`src/lib/portal/service.ts`), só o texto da mensagem não anuncia mais.
 
 Textos de referência de todos estão no `reference` de cada entrada em `templates.ts`. Mudar texto de template aprovado = novo nome.
 

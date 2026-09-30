@@ -48,7 +48,7 @@
 | 5 Portal do paciente | ✅ | 1d86511 |
 | 6 Comissões | ✅ | fc3d432 |
 | 7 Dashboard, relatórios, reativação, pesquisa | ✅ | 5419f01 |
-| 8 Endurecimento | ✅ | `check:tenant`, `check:lgpd`, dump-grep, build; E2E Playwright (`npm run e2e`, 7 specs) entregue depois do merge |
+| 8 Endurecimento | ✅ | `check:tenant`, `check:lgpd`, dump-grep, build; E2E Playwright (`npm run e2e`, 8 specs) entregue depois do merge |
 
 O que **depende da plataforma** para o Mind ir ao ar está em `docs/DEPLOY.md` §5 e na seção 8 deste documento.
 

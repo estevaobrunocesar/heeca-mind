@@ -3,6 +3,8 @@
 Data: 20/09/2026. Repositório: `hecca_psico` (branch `master`, merge `0b3ebdf`), a renomear para `heeca-mind`.
 Produto pronto no código: 18/18 critérios do §41 do briefing; 190 testes; `check:tenant` e `check:lgpd` verdes.
 
+*Nota (30/09/2026): este documento é o retrato do dia do handoff — números e checklist ficam como estavam nessa data. Repositório já renomeado (`heeca-mind`, branch `main`); estado de testes atual (199 unitários, `check:rate-limit` incluído, 8 specs E2E) em `07-TESTES.md` §6; itens do checklist resolvidos desde então ficam marcados abaixo.*
+
 ## Decisão que muda o mapa (D9)
 
 O Mind **não** nasce do motor Dental: é o `hecca_psico` integrado ao Core. Proposta: em `heeca_site/src/lib/ecosystem.ts`, `MOTORES_COMPARTILHADOS` → Health com dois motores — *Dental* (procedimento, odontograma, orçamento) e *Mind* (sessão, recorrência, prontuário cifrado, delegação). Nutri e Fono nascem do Mind. Atualizar o item G6 do `PENDENCIAS.md`.

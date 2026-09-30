@@ -7,7 +7,7 @@ Vertical de saúde mental da plataforma Heeca (antes "Hecca Psico"; o produto fo
 - Next.js 16 (App Router, Server Actions, `proxy.ts` no lugar de `middleware.ts`), React 19, TypeScript, Tailwind 4
 - Prisma 7 (`prisma-client` generator → `src/generated/prisma`, driver adapter `@prisma/adapter-pg`), PostgreSQL 16
 - Auth.js v5 (`next-auth@beta`) com Credentials + JWT
-- WhatsApp: Meta Cloud API (`src/lib/whatsapp/`)
+- WhatsApp: por WhatsApp Business (Meta), mas só via Heeca Notify — nenhum token da Meta neste app (`src/lib/whatsapp/`, detalhe abaixo)
 
 ## Comandos
 
@@ -22,6 +22,7 @@ npm run cron                  # roda dispatcher/expiração/webhook uma vez (dev
 npm run heeca:sim -- provision ana@exemplo.com          # simula o portal (provision/entitlement/sso) e o Notify (callbacks)
 npm run check:tenant          # isolamento por tenant dos módulos do Mind (banco local)
 npm run check:lgpd            # anonimização (banco local)
+npm run check:rate-limit      # integração dos limitadores (banco local)
 npm run e2e                   # Playwright na porta 3521 (uma por produto: portas redondas colidem com outras sessões desta máquina); global-setup confere `product` do /api/health antes de rodar. Dev server PARADO; PW_REUSE=1 reaproveita; E2E_PORT=... se a porta estiver reservada pelo Windows (`listen EACCES`)
 npm test
 npm run build                 # build de produção (NODE_ENV=production)

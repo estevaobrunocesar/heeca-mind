@@ -2,6 +2,8 @@
 
 Base existente: `npm test` (19 suítes de regras puras), `npm run check:lgpd` (integração real de anonimização), `scripts/smtp-check.ts`. Princípio do repo mantido: **toda regra de negócio nasce pura em `rules.ts` e é testada sem banco**; o banco entra só em serviços finos.
 
+**§1 e §2 abaixo são o plano original (pré-implementação)** — alguns nomes de arquivo/script não sobreviveram como escritos (ex.: `check:heeca`/`check:notify`/`check:packages` viraram `npm run heeca:sim`; `tenant-isolation.test.ts` virou `npm run check:tenant`). O estado real — scripts que existem hoje e passam — está em **§6**.
+
 ## 1. Unitários (puros, vitest) — por módulo novo
 
 | Módulo | Arquivo | O que prova |
@@ -31,7 +33,7 @@ Base existente: `npm test` (19 suítes de regras puras), `npm run check:lgpd` (i
 
 Suíte em `tests/e2e/` (Playwright 1.63, Chromium, 1 worker, `fullyParallel: false`). O `webServer` do config faz `next build && next start` com `E2E=1` (única chave que libera `http://` na validação de produção do `env.ts` — nunca setar em deploy). Pré-requisitos: banco local de pé, `.env` com `HEECA_PLATFORM_SECRET`, **dev server parado** (build + dev ao mesmo tempo corrompe `.next`). `PW_REUSE=1` reaproveita um servidor já de pé; `E2E_KEEP=1` não apaga os dados no fim.
 
-**Porta 3521, uma por produto.** Esta máquina roda várias sessões de produtos Heeca ao mesmo tempo e portas redondas colidem: já aconteceu de a suíte do Mind dirigir o app do Nutri (mesmo `/api/health` respondendo 200) e gravar no banco dele. Por isso o `global-setup` confere `product` no `/api/health` ANTES de rodar e falha nomeando o produto que achou. Também: o Windows (Hyper-V/WSL) reserva faixas dinâmicas a cada reinício e a 3000 pode cair dentro de uma — o sintoma é `listen EACCES` no build, não teste vermelho (`netsh interface ipv4 show excludedportrange protocol=tcp` lista as faixas). Use `E2E_PORT=3500 npm run e2e`: o config leva a porta para `NEXT_PUBLIC_APP_URL` (URLs de upload/portal, embutidas no build) e para `AUTH_URL` (destino dos redirects de login/SSO). Sem o `AUTH_URL`, o navegador é mandado para a porta do `.env` e toda navegação com redirect morre em `ERR_CONNECTION_REFUSED` — com o servidor de pé e respondendo.
+**Porta 3521, uma por produto.** Esta máquina roda várias sessões de produtos Heeca ao mesmo tempo e portas redondas colidem: já aconteceu de a suíte do Mind dirigir o app do Nutri (mesmo `/api/health` respondendo 200) e gravar no banco dele. Por isso o `global-setup` confere `product` no `/api/health` ANTES de rodar e falha nomeando o produto que achou. Também: o Windows (Hyper-V/WSL) reserva faixas dinâmicas a cada reinício e a 3000 pode cair dentro de uma — o sintoma é `listen EACCES` no build, não teste vermelho (`netsh interface ipv4 show excludedportrange protocol=tcp` lista as faixas). O padrão já é 3521 (`playwright.config.ts`); use `E2E_PORT=<outra porta>` só se ela também colidir — o config leva a porta para `NEXT_PUBLIC_APP_URL` (URLs de upload/portal, embutidas no build) e para `AUTH_URL` (destino dos redirects de login/SSO). Sem o `AUTH_URL`, o navegador é mandado para a porta do `.env` e toda navegação com redirect morre em `ERR_CONNECTION_REFUSED` — com o servidor de pé e respondendo.
 
 **IP determinístico:** o config manda `x-forwarded-for: 203.0.113.10` (TEST-NET-3) em toda requisição. Como `clientIp()` lê esse cabeçalho primeiro, os limitadores passam a ter identificador conhecido e igual em qualquer máquina — sem isso o IP é o da conexão local (`::1` no Windows, `127.0.0.1` em outros) e limpar a chave certa vira adivinhação: um filtro que erra o identificador não falha, só silenciosamente não limpa. De quebra, o caminho exercitado passa a ser o de produção, que roda atrás de proxy. Nenhum teste assere o VALOR do IP gravado (só a existência e o hash do aceite) — se algum passar a asserir, é aqui que o valor vem.
 
@@ -45,8 +47,8 @@ Fixtures (`fixtures.ts`): cada spec cria seu próprio tenant com prefixo `e2e-` 
 | `04-documento` | F7 | instalar modelos → enviar da ficha → link: nome divergente recusado, nome do cadastro aceito → `ACCEPTED` com hash de 64 hex → registro interno + e-mail ao profissional na fila |
 | `05-portal` | F9 | pedido de link → token da fila → home → reagendar sessão a 7 dias (`rescheduled=1`) → sessão a 3 h: política de 24h bloqueia (sem botão de cancelar) → "Meus dados" salva endereço → sair e reusar token → `portal?invalid=1` |
 | `06-negativos` | §41 | recepção no prontuário vê "Acesso restrito" e nenhum `ClinicalAccessLog`; tenant B em paciente/prontuário/sessão/export do A → 404 e lista sem o paciente; `/documento/<lixo>` → 404; rota do portal sem cookie volta ao pedido de acesso |
-| `08-limite-plano` | §4 | plano Solo recusa o convite de profissional (recepção não ocupa vaga); desativar devolve vaga; plano sem limite não barra; convidado sem vaga entra com o perfil desativado e `proInactive` no audit |
 | `07-clinica` | §6 (+ storage) | responsável envia logo (PNG 1×1 via `setInputFiles`) → chave `organizations/<org>/logo-*.png`, aparece em `/agendar` (CLINIC) e no portal, arquivo servido; recepção não vê o uploader; remoção zera colunas, apaga o arquivo (404) e audita `organization.logo*` |
+| `08-limite-plano` | §4 | plano Solo recusa o convite de profissional (recepção não ocupa vaga); desativar devolve vaga; plano sem limite não barra; convidado sem vaga entra com o perfil desativado e `proInactive` no audit |
 
 Fora da suíte por enquanto: lembrete (cron), PDF do documento no portal (é a mesma página do aceite), pacote com saldo no portal (coberto por `package-rules.test.ts`).
 
@@ -67,12 +69,12 @@ Fora da suíte por enquanto: lembrete (cron), PDF do documento no portal (é a m
 
 ## 6. O que roda onde
 
-Estado em 20/09/2026: `npm test` = 191 testes puros (heeca-core, notify, registration, br-document, package-rules, document-rules, commission-rules, report-rules, permissions com FINANCE e comissões, appointment-status…); `npm run check:tenant` (19 tentativas cruzadas bloqueadas) e `npm run check:lgpd` verdes; `npm run heeca:sim` cobre provision/entitlement/SSO/Notify. `npm run e2e` = 7 specs Playwright (§3) contra build de produção.
+Estado em 30/09/2026: `npm test` = 199 testes puros em 28 arquivos (heeca-core, notify, registration, br-document, package-rules, document-rules, commission-rules, report-rules, limits, permissions com FINANCE e comissões, appointment-status…); `npm run check:tenant` (19 tentativas cruzadas bloqueadas), `npm run check:lgpd` e `npm run check:rate-limit` verdes; `npm run heeca:sim` cobre provision/entitlement/SSO/Notify. `npm run e2e` = 8 specs Playwright (§3) contra build de produção.
 
 
 | Momento | Comando |
 |---|---|
 | a cada commit | `npm run typecheck && npm test && npx eslint src` |
 | a cada PR | `npm run build` — o `tsc` não detecta módulo cliente importando Prisma (Turbopack sim) |
-| antes de abrir PR | `npm run check:lgpd && npm run check:tenant` (+ `npm run heeca:sim` contra o dev server) |
+| antes de abrir PR | `npm run check:lgpd && npm run check:tenant && npm run check:rate-limit` (+ `npm run heeca:sim` contra o dev server) |
 | release | E2E + checklist de segurança §4 + restore de backup e leitura de nota cifrada |

@@ -128,6 +128,21 @@ Assinatura recorrente do paciente (§21), gateway de pagamento do paciente, mult
 
 Todas implementadas conforme a coluna "Recomendação". D7 foi resolvida na reforma do padrão de painel (30/09/2026): a sálvia provisória saiu, `globals.css` adota a cor da família saúde do kit de marca (`#f06511`), que já bate com `[data-accent="mind"]` em `ui/tokens.css` (agrupado com `dental`/`move`, também definido pela plataforma) — nada pendente dos dois lados.
 
+### D10 (decisão nova, 30/09/2026) — WhatsApp do paciente sair do número do profissional, não do número compartilhado da Heeca
+
+Bruno decidiu: **toda** mensagem automática ao paciente (confirmação, lembrete, documento, portal, pesquisa etc.) deve sair do WhatsApp do próprio profissional/clínica que ele contratou — não do número único da Heeca (hoje `11 94702-5952`). Mensagens da Heeca **para o profissional** (acesso ao sistema) continuam no número da Heeca — na prática já é assim: MFA é TOTP (não vai por WhatsApp) e avisos ao profissional (`pro-notify.ts`) já são e-mail, não WhatsApp. Hoje **100% do tráfego de WhatsApp do Mind é pro paciente**, então o pedido equivale a: mover tudo.
+
+Recusado explicitamente o atalho mais rápido (Heeca provisionar um número novo dedicado por clínica na mesma WABA, sem exigir status de Tech Provider) — Bruno quer o número **real** de cada profissional, o que só é possível via Embedded Signup da Meta.
+
+**Veredito técnico da plataforma (30/09/2026, sessão Heeca_Plataform)**, já roadmap deles como D11, dependente do D10 deles:
+- Bloqueio de negócio, não técnico: precisa do **CNPJ da Heeca sair** primeiro — sem ele não dá pra virar Tech Provider/Solution Partner da Meta (App Review de `whatsapp_business_management`/`whatsapp_business_messaging`, 2–6 semanas).
+- Hoje o Notify não tem NENHUMA abstração de tenant: `TWILIO_ACCOUNT_SID`/`TWILIO_WHATSAPP_FROM` são env vars globais do processo — um número pra plataforma inteira, não um por produto.
+- Aprovação de template por WABA nova: existe recurso da Meta (Template Library) pra ISV aprovado empurrar templates sem reaprovação individual, mas a plataforma nunca testou isso na prática.
+- Cobrança direta ao profissional (ISV billing) é viável, mas exige fluxo de onboarding novo pra coletar meio de pagamento.
+- Tamanho: **reforma de arquitetura do Notify**, não ajuste pontual — schema por tenant, fluxo de Embedded Signup, `TwilioProvider` reescrito pra credenciais por tenant, push de template por WABA nova.
+
+**Trava**: CNPJ da Heeca (decisão/ação do Bruno, fora do código) → Tech Provider (plataforma) → reforma do Notify (plataforma) → aí sim entra trabalho no Mind (passar identificador do profissional/tenant pro Notify em cada envio, hoje isso não existe em lugar nenhum do payload). **Nenhum código deste repositório muda esse quadro** — não há trabalho de preparação que valha a pena adiantar aqui sem o Notify já ter a capacidade correspondente do outro lado.
+
 ## 6. Ajustes de rota feitos durante a execução (não previstos no plano)
 
 - `heeca_lembrete` unificado tem botões quick_reply → sessões criadas manualmente ganham `confirmationToken` sob demanda ao enfileirar (bug real pego no E2E da etapa 5).

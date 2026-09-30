@@ -155,7 +155,7 @@ export async function enqueueFormRequest(requestId: string, token: string) {
       appointmentId: true,
       titleSnapshot: true,
       patient: { select: { id: true, name: true, whatsapp: true } },
-      professional: { select: { displayName: true } },
+      professional: { select: { displayName: true, organization: { select: { name: true, type: true } } } },
     },
   });
   const type = "FORM_REQUEST" as const;
@@ -173,6 +173,7 @@ export async function enqueueFormRequest(requestId: string, token: string) {
         bodyVariables: buildVariables(type, {
           patientFirstName: r.patient.name.split(" ")[0] ?? r.patient.name,
           professionalName: r.professional.displayName,
+          establishment: establishmentOf(r.professional.organization, r.professional.displayName),
           formTitle: r.titleSnapshot,
         }),
         buttons: buildButtons(type, { formToken: token }),
@@ -235,7 +236,7 @@ export async function enqueuePortalLogin(patientId: string, token: string) {
 export async function enqueueDocumentRequest(requestId: string, token: string) {
   const r = await db.documentRequest.findUniqueOrThrow({
     where: { id: requestId },
-    select: { organizationId: true, appointmentId: true, titleSnapshot: true, patient: { select: { id: true, name: true, whatsapp: true } }, professional: { select: { displayName: true } } },
+    select: { organizationId: true, appointmentId: true, titleSnapshot: true, patient: { select: { id: true, name: true, whatsapp: true } }, professional: { select: { displayName: true, organization: { select: { name: true, type: true } } } } },
   });
   const type = "DOCUMENT_REQUEST" as const;
   return db.notification.create({
@@ -248,7 +249,12 @@ export async function enqueueDocumentRequest(requestId: string, token: string) {
       recipient: r.patient.whatsapp,
       templateName: TEMPLATES[type].name,
       payload: {
-        bodyVariables: buildVariables(type, { patientFirstName: r.patient.name.split(" ")[0] ?? r.patient.name, professionalName: r.professional.displayName, documentTitle: r.titleSnapshot }),
+        bodyVariables: buildVariables(type, {
+          patientFirstName: r.patient.name.split(" ")[0] ?? r.patient.name,
+          professionalName: r.professional.displayName,
+          establishment: establishmentOf(r.professional.organization, r.professional.displayName),
+          documentTitle: r.titleSnapshot,
+        }),
         buttons: buildButtons(type, { documentToken: token }),
       } satisfies WhatsAppPayload,
     },
@@ -265,7 +271,7 @@ export async function enqueueWaitlistJoined(entryId: string) {
     select: {
       organizationId: true,
       patient: { select: { id: true, name: true, whatsapp: true } },
-      professional: { select: { displayName: true } },
+      professional: { select: { displayName: true, organization: { select: { name: true, type: true } } } },
     },
   });
   const type = "WAITLIST_JOINED" as const;
@@ -281,6 +287,7 @@ export async function enqueueWaitlistJoined(entryId: string) {
         bodyVariables: buildVariables(type, {
           patientFirstName: e.patient.name.split(" ")[0] ?? e.patient.name,
           professionalName: e.professional.displayName,
+          establishment: establishmentOf(e.professional.organization, e.professional.displayName),
         }),
       },
     },
